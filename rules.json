@@ -1,0 +1,12 @@
+{
+  "metrics": {
+    "loc": { "warning": 50, "critical": 80 },
+    "nesting": { "warning": 3, "critical": 5 },
+    "complexity": { "warning": 10, "critical": 20 },
+    "params": { "warning": 4, "critical": 7 }
+  },
+  "patterns": {
+    "broad_exceptions": ["Exception", "BaseException"],
+    "empty_exceptions": ["pass", "return"]
+  }
+}
