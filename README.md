@@ -1,100 +1,191 @@
 # RepoMind
 
-**AI-powered Repository Intelligence Platform**
+**Evidence-Driven Repository Intelligence Platform**
 
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python\&logoColor=white)
 ![Typer](https://img.shields.io/badge/Typer-CLI-009688)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql\&logoColor=white)
+![pgvector](https://img.shields.io/badge/pgvector-Vector_Search-4169E1)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker\&logoColor=white)
 ![Gemini](https://img.shields.io/badge/Gemini-2.5_Pro-4285F4?logo=google\&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-success)
 
-RepoMind analyzes source code repositories, identifies engineering improvement opportunities, prioritizes the highest-impact next actions, and generates implementation blueprints.
+RepoMind is an AI-assisted repository intelligence platform that combines **deterministic static analysis** with **LLM-powered engineering reasoning** to help developers identify technical debt, prioritize engineering improvements, and generate implementation blueprints.
 
 Unlike repository chat tools that answer:
 
-> "What does this code do?"
+> **"What does this code do?"**
 
-RepoMind focuses on:
+RepoMind answers:
 
-> "What should I improve next?"
+> **"What should engineers improve next, and why?"**
+
+RepoMind performs **evidence-first analysis** using deterministic Python AST inspection before leveraging AI to transform verified findings into engineering recommendations and implementation blueprints.
 
 ---
 
-## Features
+# Features
 
-* Repository analysis and metadata extraction
+## Deterministic Code Intelligence
+
+* Deterministic AST-based repository auditing
+* Function-level cyclomatic complexity analysis
+* Nesting depth analysis
+* Exception handling analysis
+* Security anti-pattern detection
+* Broad exception detection
+* Empty exception detection
+* God File detection
+* Evidence-based repository health scoring
+* Configurable engineering rules via `rules.json`
+
+## AI-Powered Engineering Intelligence
+
 * Repository maturity detection
-* Repository health assessment
-* Function-level code auditing
 * Engineering recommendation generation
-* Implementation blueprint generation
-* PostgreSQL + pgvector powered repository intelligence
+* Refactoring blueprint generation
+* Repository architecture reasoning
+
+## Repository Intelligence
+
+* Repository metadata extraction
+* Repository structure analysis
+* Dockerized PostgreSQL + pgvector knowledge base
+* Vector embedding cache to prevent duplicate indexing
 * CLI-first workflow
+* Persistent repository intelligence
 
 ---
 
-## Example
+# Example
 
 ```bash
 repomind analyze https://github.com/fastapi/fastapi
 ```
 
-Output:
+Example output
 
 ```text
 Repository Stage: Mature
 
-Top Finding:
-get_request_handler()
-Complexity: 32
-Nesting: 6
+Health Report
+Architecture: 82/100
+Testing: 77/100
+Security: 91/100
+Documentation: 85/100
+Scalability: 96/100
 
-Recommended Next Action:
-Refactor request handling flow to reduce complexity and improve maintainability.
+Top Findings
+
+• GOD_FILE
+  fastapi/routing.py
+  6231 LOC
+
+• HIGH_COMPLEXITY
+  get_request_handler()
+  Complexity: 35
+
+• BROAD_EXCEPTION
+  get_request_handler()
+
+Recommended Next Action
+
+Refactor routing.py into smaller routing modules to improve maintainability and reduce architectural complexity.
 ```
 
 ---
 
-## Installation
+# Core Analysis Capabilities
+
+RepoMind currently detects:
+
+* High cyclomatic complexity
+* Deep nesting
+* Broad exception handling
+* Empty exception blocks
+* Oversized modules (God Files)
+* Repository architecture metrics
+* Repository maturity
+* Deterministic repository health scores
+
+---
+
+# Installation
+
+Clone the repository
 
 ```bash
 git clone https://github.com/yourusername/repomind.git
 
 cd repomind
+```
 
+Install dependencies
+
+```bash
 uv sync
 ```
 
-Create a `.env` file:
+Start PostgreSQL with pgvector
+
+```bash
+docker compose up -d
+```
+
+Create a `.env` file
 
 ```env
-DATABASE_URL=postgresql://...
+DATABASE_URL=postgresql://postgres:password@localhost:5432/repomind
 GEMINI_API_KEY=your_api_key
 ```
 
 ---
 
-## Usage
+# Database
 
-Analyze a repository:
+RepoMind uses **PostgreSQL 16** with the **pgvector** extension running inside Docker for storing:
+
+* Repository metadata
+* Repository health reports
+* Engineering findings
+* Recommendations
+* Vector embeddings
+
+Default Docker configuration
+
+| Setting  | Value                  |
+| -------- | ---------------------- |
+| Image    | pgvector/pgvector:pg16 |
+| Database | repomind               |
+| Username | postgres               |
+| Password | password               |
+| Port     | 5432                   |
+
+Persistent data is stored using a Docker volume.
+
+---
+
+# Usage
+
+Analyze a repository
 
 ```bash
 repomind analyze <repository-url>
 ```
 
-Run a deterministic audit:
+Run a deterministic AST audit
 
 ```bash
 repomind audit <repository-url>
 ```
 
-Generate a blueprint:
+Generate an implementation blueprint
 
 ```bash
 repomind blueprint <recommendation-id>
 ```
 
-Generate a report:
+Generate an engineering report
 
 ```bash
 repomind report <repository-url>
@@ -102,34 +193,68 @@ repomind report <repository-url>
 
 ---
 
-## Documentation
+# Architecture
 
-Full documentation, architecture details, setup guides, and roadmap are available on the documentation website.
-
-**Documentation:** 
+```text
+                     Git Repository
+                            │
+                            ▼
+                  Repository Parser
+                            │
+                            ▼
+                Deterministic AST Engine
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   ▼                   ▼
+ Complexity Analysis   Security Analysis   God File Detection
+        │                   │                   │
+        └───────────────────┼───────────────────┘
+                            │
+                            ▼
+           Evidence-Based Health Scoring Engine
+                            │
+               ┌────────────┴────────────┐
+               ▼                         ▼
+     PostgreSQL Metadata         pgvector Embeddings
+          (Docker)                   (Docker)
+               │                         │
+               └────────────┬────────────┘
+                            ▼
+               AI Engineering Intelligence
+                            │
+                            ▼
+             Recommendations & Blueprints
+```
 
 ---
 
-## Tech Stack
+# Tech Stack
 
-### Core
+## Core
 
 * Python
 * Typer
-* PostgreSQL
+
+## Database & Infrastructure
+
+* PostgreSQL 16
 * pgvector
+* Docker
+* Docker Compose
 
-### Repository Analysis
+## Static Analysis
 
+* Python AST
 * Tree-Sitter
 * GitPython
 
-### AI
+## AI
 
 * Gemini 2.5 Pro
-* BGE Small Embeddings
+* BAAI BGE Small Embeddings
 
-### Quality
+## Developer Experience
 
 * Ruff
 * MyPy
@@ -137,17 +262,32 @@ Full documentation, architecture details, setup guides, and roadmap are availabl
 
 ---
 
-## Status
+# Project Status
 
-RepoMind is currently in active development and focused on improving:
+RepoMind is actively evolving into an engineering intelligence platform.
 
-* Repository understanding
-* Recommendation quality
-* Blueprint generation
-* Deterministic code analysis
+## Current Capabilities
+
+* Deterministic AST-based repository analysis
+* Evidence-based repository health scoring
+* AI-assisted engineering recommendations
+* Implementation blueprint generation
+* Repository vector indexing with pgvector
+* Dockerized PostgreSQL infrastructure
+* Configurable engineering rules
+* CLI-first workflow
+
+## Planned Improvements
+
+* Additional AST analysis rules
+* Rich engineering reports
+* Enhanced implementation blueprints
+* Multi-language support
+* Performance optimizations
+* Advanced architectural metrics
 
 ---
 
-## License
+# License
 
 MIT License
