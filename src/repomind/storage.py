@@ -13,8 +13,12 @@ def save_repository(db: Session, meta: Dict[str, str], url: str) -> Repository:
         name=meta["name"],
         owner=meta["owner"],
         github_url=url,
-        local_path=meta["local_path"]
+        local_path=meta["local_path"],
+        # --- PHASE 1 FIX: Capture language & framework ---
+        language=meta.get("language"),
+        framework=meta.get("framework")
     )
+
     db.add(repo)
     db.commit()
     db.refresh(repo)
@@ -67,8 +71,8 @@ def save_health_scores(db: Session, repo_id: Any, scores: Dict[str, int]) -> Non
     db.commit()
 
 
-def save_findings(db: Session, repo_id: Any, findings_data: list[Dict[str, str]]) -> None:
-    """Save detected issues to the database."""
+def save_findings(db: Session, repo_id: Any, findings_data: list[Dict[str, Any]]) -> None:
+    """Save detected issues and deterministic AST metrics to the database."""
     # Clear out old findings if re-analyzing
     db.query(Finding).filter(Finding.repository_id == repo_id).delete()
     
@@ -79,7 +83,12 @@ def save_findings(db: Session, repo_id: Any, findings_data: list[Dict[str, str]]
             title=issue.get("title", "Unknown Issue"),
             category=issue.get("category", "General"),
             severity=issue.get("severity", "Medium"),
-            description=issue.get("description", "No description provided.")
+            description=issue.get("description", "No description provided."),
+            # --- Capture the AST Math ---
+            file_path=issue.get("file_path"),
+            function_name=issue.get("function_name"),
+            complexity=issue.get("complexity"),
+            nesting=issue.get("nesting")
         )
         findings_to_save.append(finding)
         
@@ -88,20 +97,21 @@ def save_findings(db: Session, repo_id: Any, findings_data: list[Dict[str, str]]
         db.commit()
 
 
-def save_recommendations(db: Session, repo_id: Any, recommendations_data: list[Dict[str, Any]]) -> list[Recommendation]:
-    """Save prioritized recommendations and cleanup associated blueprints."""
+def save_recommendations(
+    db: Session, 
+    repo_id: Any, 
+    recommendations_data: list[dict[str, Any]],
+    db_findings: list[Finding] | None = None  # <-- Explicitly allow None
+) -> list[Recommendation]:
+    """Save prioritized recommendations and link them to their AST findings."""
     
-    # 1. Find all existing recommendation IDs for this repo
     existing_recs = db.query(Recommendation).filter(Recommendation.repository_id == repo_id).all()
     rec_ids = [r.id for r in existing_recs]
     
-    # 2. Delete all blueprints associated with these old recommendations first
     if rec_ids:
         db.query(Blueprint).filter(Blueprint.recommendation_id.in_(rec_ids)).delete(synchronize_session=False)
-        # 3. Now delete the recommendations themselves
         db.query(Recommendation).filter(Recommendation.repository_id == repo_id).delete(synchronize_session=False)
     
-    # 4. Save new ones (rest of your logic remains the same)
     if not recommendations_data:
         return []
         
@@ -120,6 +130,15 @@ def save_recommendations(db: Session, repo_id: Any, recommendations_data: list[D
             priority_score=rec.get("priority_score", 0.0),
             is_recommended=(i == 0)
         )
+        
+        # --- PHASE 1 FIX: Match LLM IDs to Database Objects ---
+        if db_findings:
+            for finding_id in rec.get("linked_finding_ids", []):
+                # Find the actual database object that matches the UUID the AI returned
+                matched_finding = next((f for f in db_findings if str(f.id) == finding_id), None)
+                if matched_finding:
+                    recommendation.linked_findings.append(matched_finding)
+                
         saved_recs.append(recommendation)
         
     db.add_all(saved_recs)

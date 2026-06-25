@@ -1,11 +1,9 @@
-import os, time
+import os
 import json
 from typing import Dict, Any
 from google import genai 
 from google.genai import types 
-from sqlalchemy.orm import Session
-from uuid import UUID 
-from repomind.embedding import get_relevant_chunks
+from repomind.analyzer import get_code_slice
 
 
 def detect_repository_stage(repo_meta: Dict[str, str], structure: Dict[str, int]) -> Dict[str, Any]:
@@ -60,144 +58,187 @@ def detect_repository_stage(repo_meta: Dict[str, str], structure: Dict[str, int]
     return {"stage": "Unknown", "confidence": 0, "reasoning": "API returned empty response."}
 
 
-def analyze_repository_health(repo_meta: Dict[str, str], structure: Dict[str, int], stage: str) -> Dict[str, int]:
-    """Evaluate repository health scores."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key)
-    
-    prompt = f"""
-    You are an expert Software Auditor. Evaluate the repository health based on the following metadata.
-    
-    Repository: {repo_meta['name']}
-    Detected Stage: {stage}
-    Total Files: {structure['files']}
-    Total Classes: {structure['classes']}
-    Total Functions: {structure['functions']}
-    
-    Estimate the health scores (0-100) for this repository based on its stage and size.
-    Respond ONLY with a valid JSON object matching this exact schema:
-    {{
-        "architecture_score": 85,
-        "testing_score": 60,
-        "security_score": 75,
-        "documentation_score": 80,
-        "scalability_score": 70,
-        "maturity_score": 74
-    }}
-    """
-    
-    response = client.models.generate_content(
-        model='gemini-3.1-flash-lite',
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            temperature=0.1
-        )
-    )
-    
-    if response.text:
-        return dict(json.loads(response.text))
-        
-    # Fallback in case of failure
-    return {k: 0 for k in ["architecture_score", "testing_score", "security_score", "documentation_score", "scalability_score", "maturity_score"]}
-
-
 
 
 def detect_repository_issues(
-    db: Session, 
-    repo_id: UUID,
-    repo_meta: Dict[str, str], 
-    structure: Dict[str, int], 
-    stage: str, 
-    health_scores: Dict[str, int]
-) -> list[Dict[str, str]]:
+    repo_meta: dict[str, str], 
+    top_findings: list[dict[str, Any]]
+) -> list[dict[str, str]]:
+    """Synthesize deterministic AST findings and actual code context into readable issues."""
     
-    # Corrected: Combined context and audit instructions into a single variable
-    chunks = get_relevant_chunks(db, repo_id, "complex logic, deep nesting, missing error handling", limit=3)
-    code_context = "\n\n".join([f"File: {c.file_path}\nCode: {c.content}" for c in chunks])
+    if not top_findings:
+        return []
+        
+    evidence = ""
+    for f in top_findings:
+        findings_list: list[dict[str, Any]] = f.get("findings", [])
+        finding_types = [issue.get("type", "UNKNOWN") for issue in findings_list]
+        
+        # --- THE FIX: Robust Context Extraction ---
+        start = f.get('start_line')
+        end = f.get('end_line')
+        
+        # Check if we have valid line numbers (Function-level finding)
+        if start is not None and end is not None:
+            code_snippet = get_code_slice(f['file'], start, end)
+        else:
+            # Fallback: God File finding (Module-level). Read first 60 lines.
+            try:
+                with open(f['file'], 'r', encoding='utf-8') as file_obj:
+                    lines = file_obj.readlines()
+                    code_snippet = "".join(lines[:60]) + "\n... [Full module truncated for Context Limit] ..."
+            except Exception:
+                code_snippet = "Error: Could not read file content."
+        
+        # Defensive constraint: Truncate massive snippets
+        code_lines = code_snippet.split('\n')
+        if len(code_lines) > 60:
+            code_snippet = '\n'.join(code_lines[:60]) + "\n... [Code Truncated for Context Limit] ..."
+            
+        evidence += f"### TARGET: Function `{f['function']}` (File: {f['file']})\n"
+        evidence += f"- Metrics: Complexity={f.get('complexity', 'N/A')}, Nesting={f.get('nesting', 'N/A')}\n"
+        evidence += f"- Violations: {', '.join(finding_types)}\n"
+        evidence += f"- Source Code Evidence:\n```python\n{code_snippet}\n```\n\n"
     
     prompt = f"""
-    You are a Senior Staff Auditor. Analyze the repository metrics and code evidence.
+    You are a Senior Staff Auditor. I have run a deterministic AST analysis on the repository "{repo_meta['name']}".
     
-    [METRICS] {json.dumps(health_scores)}
-    [CODE EVIDENCE] {code_context}
+    [HARD CODE EVIDENCE]
+    {evidence}
     
-    Identify 3-5 issues. Cite files. Respond ONLY in JSON.
+    Task:
+    Write a clear, concise issue report for EACH of the findings provided above. 
+    1. Look at the provided source code to see EXACTLY what is causing the high complexity/nesting.
+    2. Cite the specific logic (e.g., "The massive switch statement handling user auth...") in your description.
+    3. DO NOT invent new issues. Only explain the evidence provided.
+    
+    Respond ONLY with a valid JSON array matching this exact schema:
+    [
+        {{
+            "title": "High Complexity in [Function Name]",
+            "category": "Technical Debt",
+            "severity": "High",
+            "description": "Specific explanation of the messy logic found in the code snippet..."
+        }}
+    ]
     """
     
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     response = client.models.generate_content(
         model='gemini-3.1-flash-lite',
         contents=prompt,
-        config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
+        config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1)
     )
-    return list(json.loads(response.text)) if response.text else []
+    
+    # ... existing Gemini client call ...
+    
+    parsed_issues = list(json.loads(response.text)) if response.text else []
+    
+    # --- PHASE 2.5 FIX: Inject the math back into the AI payload ---
+    for i, issue in enumerate(parsed_issues):
+        if i < len(top_findings):
+            issue["file_path"] = top_findings[i].get("file")
+            issue["function_name"] = top_findings[i].get("function")
+            issue["complexity"] = top_findings[i].get("complexity")
+            issue["nesting"] = top_findings[i].get("nesting")
+            
+    return parsed_issues
 
 
 
 def generate_recommendations(
-    repo_meta: Dict[str, str], 
+    repo_meta: dict[str, str], 
     stage: str, 
-    health_scores: Dict[str, int], 
-    findings: list[Dict[str, str]]
-) -> list[Dict[str, Any]]:
-    """Generate and prioritize engineering recommendations."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key)
+    db_findings: list[Any] # Accepts SQLAlchemy Finding objects
+) -> list[dict[str, Any]]:
+    """Generate engineering recommendations explicitly linked to deterministic findings."""
     
+    # --- PHASE 2.5 & 3: Finding Enrichment & Deterministic Priority Math ---
+    # --- PHASE 2.5 & 3: Finding Enrichment & Deterministic Priority Math ---
+    payload = []
+    for f in db_findings:
+        # Map string severities to mathematical weights
+        sev_map = {"High": 10, "Medium": 5, "Low": 2}
+        sev = sev_map.get(str(f.severity), 5)
+            
+        comp = f.complexity or 0
+        nest = f.nesting or 0
+        
+        # The Math: Higher complexity, nesting, and severity = higher priority
+        raw_score = (comp * 2) + (nest * 3) + (sev * 2)
+        p_score = min(10.0, round(raw_score / 10.0, 1))
+        
+        payload.append({
+            "finding_id": str(f.id),
+            "file": f.file_path,
+            "function": f.function_name,
+            "issue": f.title,
+            "calculated_priority_score": p_score
+        })
+
     prompt = f"""
-    You are a Lead Staff Engineer. Analyze this repository and provide actionable engineering recommendations.
-    
-    Repository: {repo_meta['name']}
+    You are a Lead Staff Engineer analyzing a {repo_meta.get('language', 'software')} repository.
     Stage: {stage}
-    Health Scores: {json.dumps(health_scores)}
-    Discovered Issues: {json.dumps(findings)}
+    
+    [DETERMINISTIC CODE FINDINGS]
+    {json.dumps(payload, indent=2)}
     
     Task:
-    1. Address the most critical "Discovered Issues" with concrete solutions.
-    2. Discover and recommend 1 or 2 missing features or capabilities appropriate for a "{stage}" stage repository (e.g., CI/CD pipelines, Search, Analytics, Audit Logs, Caching).
-    3. Score every recommendation from 1.0 to 10.0 for Impact, Effort, Risk, and Cost.
-    4. Calculate a 'priority_score' (out of 10.0). High impact and low effort should yield a high priority score.
+    1. Group the provided findings into 3 to 5 high-level architectural Recommendations (e.g., "Refactor Routing Complexity").
+    2. Assign the exact 'finding_id' strings of the grouped findings to the recommendation.
+    3. DO NOT INVENT priority scores. The recommendation's 'priority_score' MUST be exactly the highest 'calculated_priority_score' out of its linked findings.
     
-    Respond ONLY with a valid JSON array of objects matching this exact schema:
+    Respond ONLY with a valid JSON array of objects matching this schema:
     [
         {{
-            "title": "Implement Integration Test Suite",
-            "description": "Establish a core integration testing pipeline to address the low testing coverage and prevent regressions.",
+            "title": "Refactor Routing Complexity",
+            "description": "Decompose the deeply nested request handlers to improve maintainability.",
+            "priority_score": 9.8,
             "impact_score": 9.0,
             "effort_score": 5.0,
-            "risk_score": 2.0,
-            "cost_score": 3.0,
-            "priority_score": 8.5
+            "linked_finding_ids": ["uuid-string-1", "uuid-string-2"]
         }}
     ]
     """
     
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     response = client.models.generate_content(
         model='gemini-3.1-flash-lite',
         contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            temperature=0.2
-        )
+        config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1)
     )
     
-    if response.text:
-        return list(json.loads(response.text))
-        
-    return []
+    return list(json.loads(response.text)) if response.text else []
 
-def generate_blueprint(recommendation_title: str, recommendation_desc: str) -> Dict[str, Any]:
-    """Generate a step-by-step implementation blueprint."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key)
+def generate_blueprint(
+    recommendation_title: str, 
+    recommendation_desc: str,
+    repo_meta: dict[str, str],
+    linked_findings: list[Any]
+) -> dict[str, Any]:
+    """Generate an implementation blueprint bounded by rigid repository constraints."""
     
+    # --- PHASE 4 & 5: The Anti-Hallucination Box ---
+    language = repo_meta.get('language', 'Unknown')
+    framework = repo_meta.get('framework', 'Unknown')
+    
+    evidence = ""
+    for f in linked_findings:
+        evidence += f"- Target: {f.file_path} (Function: {f.function_name}) | Issue: {f.title}\n"
+        
     prompt = f"""
-    You are a Senior Staff Software Engineer. Create a detailed implementation blueprint for the following engineering task:
+    You are a Senior Staff {language} Engineer. Create an implementation blueprint.
     
     Task: {recommendation_title}
     Context: {recommendation_desc}
+    
+    [RIGID CONSTRAINTS]
+    - Target Language: {language}
+    - Target Framework: {framework}
+    - CRITICAL: You MUST NOT generate file paths, extensions (like .ts for Python), or design patterns that do not belong in a standard {language} ecosystem.
+    
+    [HARD EVIDENCE TO REFACTOR]
+    {evidence}
     
     Respond ONLY with a valid JSON object matching this exact schema:
     {{
@@ -205,75 +246,19 @@ def generate_blueprint(recommendation_title: str, recommendation_desc: str) -> D
         "architecture_changes": ["List of high-level changes"],
         "files_to_create": ["List of new file paths"],
         "files_to_modify": ["List of existing files to change"],
-        "database_changes": ["List of schema changes or 'None'"],
-        "api_changes": ["List of endpoint changes or 'None'"],
-        "testing_requirements": ["Specific tests to write"],
         "estimated_effort": "e.g., 2 weeks, 3 days",
-        "implementation_steps": [
-            "Step 1: Detailed action...",
-            "Step 2: Detailed action..."
-        ]
+        "implementation_steps": ["Step 1:...", "Step 2:..."]
     }}
     """
     
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     response = client.models.generate_content(
         model='gemini-3.1-flash-lite',
         contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            temperature=0.1
-        )
+        config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1)
     )
     
-    if response.text:
-        return dict(json.loads(response.text))
-        
-    return {}
+    return dict(json.loads(response.text)) if response.text else {}
 
 
-def generate_ai_explanation(issue: dict) -> str:
-    """
-    Synthesize pre-discovered findings into actionable engineering advice.
-    Includes exponential backoff for API rate limits (503 errors).
-    """
-    api_key = os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key)
     
-    finding_types = [f.get("type", "UNKNOWN") for f in issue.get('findings', [])]
-    
-    prompt = f"""
-    You are a Senior Staff Engineer. I have performed a static analysis on this function:
-    
-    Function: {issue['function']}
-    File: {issue['file']}
-    Metrics: Complexity={issue['complexity']}, Nesting={issue['nesting']}
-    Detected Issues: {', '.join(finding_types)}
-    
-    Task:
-    1. Explain concisely why these specific metrics indicate a maintenance risk.
-    2. Provide 1-2 concrete, high-level refactoring strategies.
-    
-    Respond in plain text. Keep it under 100 words.
-    """
-    
-    max_retries = 3
-    base_delay = 3 # Start with a 3-second wait
-    
-    for attempt in range(max_retries):
-        try:
-            response = client.models.generate_content(
-                model='gemini-3.1-flash-lite',
-                contents=prompt,
-                config=types.GenerateContentConfig(temperature=0.3)
-            )
-            return response.text or "No explanation generated."
-            
-        except Exception as e:
-            # If it's a 503 or 429 error and we have retries left, wait and try again
-            if attempt < max_retries - 1:
-                sleep_time = base_delay * (2 ** attempt) # 3s, then 6s
-                time.sleep(sleep_time)
-                continue
-                
-            # If we are out of retries, return the error string
-            return f"[API Error: The AI service is currently busy. ({type(e).__name__})]"

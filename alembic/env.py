@@ -1,21 +1,15 @@
-import os
-import sys
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-import pgvector.sqlalchemy
 
 
 
 from alembic import context
 
-# Add our src directory to the Python path so it can find 'repomind'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 # Import our Base and Models
 from repomind.database import Base
-import repomind.models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

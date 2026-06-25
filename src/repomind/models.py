@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, Text, Boolean, Table
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from pgvector.sqlalchemy import Vector 
+from sqlalchemy.orm import relationship
 from repomind.database import Base
 
 def utc_now() -> datetime:
@@ -18,6 +19,10 @@ class Repository(Base):
     github_url = Column(String, nullable=False)
     default_branch = Column(String, nullable=True)
     local_path = Column(String, nullable=True)
+
+    language = Column(String, nullable=True)
+    framework = Column(String, nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=utc_now)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
@@ -30,9 +35,7 @@ class Embedding(Base):
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     
-    # We generated 384-dimensional vectors with BGE-Small
     embedding = Column(Vector(384), nullable=False) 
-    
     generated_at = Column(DateTime(timezone=True), default=utc_now)
 
 class RepositoryHealth(Base):
@@ -48,20 +51,34 @@ class RepositoryHealth(Base):
     maturity_score = Column(Integer, nullable=False)
     generated_at = Column(DateTime(timezone=True), default=utc_now)
 
+# --- Phase 1: Core Table Join ---
+recommendation_findings = Table(
+    "recommendation_findings",
+    Base.metadata,
+    Column("recommendation_id", UUID(as_uuid=True), ForeignKey("recommendations.id", ondelete="CASCADE"), primary_key=True),
+    Column("finding_id", UUID(as_uuid=True), ForeignKey("findings.id", ondelete="CASCADE"), primary_key=True),
+    Column("linked_at", DateTime(timezone=True), default=utc_now)
+)
 
 class Finding(Base):
     __tablename__ = "findings"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     repository_id = Column(UUID(as_uuid=True), ForeignKey("repositories.id"), nullable=False)
+    
+    # --- Phase 2.5: AST Deterministic Evidence ---
+    file_path = Column(String, nullable=True)
+    function_name = Column(String, nullable=True)
+    complexity = Column(Integer, nullable=True)
+    nesting = Column(Integer, nullable=True)
+    
     title = Column(String, nullable=False)
-    category = Column(String, nullable=False)  # e.g., Testing, Security, Technical Debt
-    severity = Column(String, nullable=False)  # e.g., High, Medium, Low
+    category = Column(String, nullable=False)  
+    severity = Column(String, nullable=False)  
     description = Column(Text, nullable=False)
     generated_at = Column(DateTime(timezone=True), default=utc_now)
 
-
-from sqlalchemy import Boolean
+    recommendations = relationship("Recommendation", secondary=recommendation_findings, back_populates="linked_findings")
 
 class Recommendation(Base):
     __tablename__ = "recommendations"
@@ -78,6 +95,7 @@ class Recommendation(Base):
     is_recommended = Column(Boolean, default=False)
     generated_at = Column(DateTime(timezone=True), default=utc_now)
 
+    linked_findings = relationship("Finding", secondary=recommendation_findings, back_populates="recommendations")
 
 class Blueprint(Base):
     __tablename__ = "blueprints"

@@ -1,19 +1,25 @@
-import typer, os, time
+import typer
+import time
 from pathlib import Path
 from dotenv import load_dotenv
+
+# Core Pipeline
 from repomind.loader import clone_repository, validate_github_url
 from repomind.parser import analyze_repository_structure
 from repomind.embedding import chunk_text, generate_embeddings
+
+# Database & Storage
 from repomind.database import SessionLocal
-from repomind.models import Repository, Embedding, RepositoryHealth
-from repomind.ai import detect_repository_stage, analyze_repository_health, detect_repository_issues, generate_recommendations, generate_blueprint, generate_ai_explanation
+from repomind.models import Repository, Embedding, RepositoryHealth, Finding, Recommendation
 from repomind.storage import save_repository, save_embeddings, save_health_scores, save_findings, save_recommendations, save_blueprint
-from repomind.reporting import generate_analysis_markdown, generate_blueprint_markdown, save_report
-from repomind.models import Repository, RepositoryHealth, Finding, Recommendation, Blueprint
-from repomind.analyzer import get_function_registry, get_code_slice
-from repomind.validator import load_rules, evaluate_function
+
+# Intelligence & Math
+from repomind.analyzer import run_deterministic_audit, calculate_deterministic_health, classify_maturity
 from repomind.prioritizer import get_top_issues
-from repomind.analyzer_metrics import analyze_function_body
+from repomind.ai import detect_repository_stage, detect_repository_issues, generate_recommendations, generate_blueprint
+
+# Reporting
+from repomind.reporting import generate_analysis_markdown, generate_blueprint_markdown, save_report
 
 
 # Load environment variables from .env file
@@ -41,6 +47,11 @@ def analyze(repository_url: str) -> None:
         
         # 1. Save Repository to Database
         repo_record = save_repository(db, meta, repository_url)
+        # Directly beneath repo_record = save_repository(db, meta, repository_url)
+        if repo_record is None:
+            typer.secho("Error: Failed to register repository in the database.", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
         typer.echo(f"Database Record ID: {repo_record.id}")
         
         # 2. Parse Architecture
@@ -86,22 +97,31 @@ def analyze(repository_url: str) -> None:
                         
             typer.secho(f"\n✓ Saved {total_vectors} vectors to Postgres (pgvector)!", fg=typer.colors.GREEN)
 
-        # 4. AI Stage Detection
-        typer.echo("Executing AI Stage Detection via Gemini 2.5 Pro...")
-        analysis = detect_repository_stage(meta, structure)
+        # # 4. AI Stage Detection
+        # typer.echo("Executing AI Stage Detection via Gemini 2.5 Pro...")
+        # analysis = detect_repository_stage(meta, structure)
         
-        typer.secho("\n--- Intelligence Report ---", fg=typer.colors.MAGENTA)
-        typer.echo(f"Detected Stage: {analysis['stage']}")
-        typer.echo(f"Confidence Score: {analysis['confidence']}%")
-        typer.echo(f"Architectural Reasoning: {analysis['reasoning']}")
-        typer.echo("---------------------------\n")
+        # typer.secho("\n--- Intelligence Report ---", fg=typer.colors.MAGENTA)
+        # typer.echo(f"Detected Stage: {analysis['stage']}")
+        # typer.echo(f"Confidence Score: {analysis['confidence']}%")
+        # typer.echo(f"Architectural Reasoning: {analysis['reasoning']}")
+        # typer.echo("---------------------------\n")
         
-        # 5. Health Analysis
-        typer.echo("Executing Health Analysis...")
-        health_scores = analyze_repository_health(meta, structure, analysis['stage'])
+       # ---------------------------------------------------------
+        # --- PHASE 6: THE PIPELINE FLIP (Evidence First) ---
+        # ---------------------------------------------------------
+
+        # 5. Deterministic AST Audit (Moved up!)
+        typer.echo("Executing deterministic AST code audit...")
+        raw_audit_findings = run_deterministic_audit(meta["local_path"])
+        analysis = classify_maturity(structure)
+        
+        # 6. Evidence-Based Health Scores (No AI used here!)
+        typer.echo("Calculating deterministic health scores...")
+        health_scores = calculate_deterministic_health(structure, raw_audit_findings)
         save_health_scores(db, repo_record.id, health_scores)
         
-        typer.secho("\n--- Health Report ---", fg=typer.colors.BLUE)
+        typer.secho("\n--- Health Report (Evidence-Based) ---", fg=typer.colors.BLUE)
         typer.echo(f"Architecture:  {health_scores['architecture_score']}/100")
         typer.echo(f"Testing:       {health_scores['testing_score']}/100")
         typer.echo(f"Security:      {health_scores['security_score']}/100")
@@ -110,33 +130,46 @@ def analyze(repository_url: str) -> None:
         typer.secho(f"Overall Score: {health_scores['maturity_score']}/100", bold=True)
         typer.echo("---------------------------\n")
 
-        # 6. Issue Detection
-        typer.echo("Auditing repository for code-level issues...")
-        findings = detect_repository_issues(db, repo_record.id, meta, structure, analysis['stage'], health_scores)
+       # 7. AI Synthesis and Display
+        typer.echo("Synthesizing code-level issues via AI...")
+        top_audit_findings = get_top_issues(raw_audit_findings, limit=5)
+        findings = detect_repository_issues(meta, top_audit_findings)
+        
         save_findings(db, repo_record.id, findings)
         
-        typer.secho("\n--- Discovered Issues ---", fg=typer.colors.RED)
+        typer.secho("\n--- Discovered Issues (Evidence-Based) ---", fg=typer.colors.RED)
         if not findings:
             typer.echo("No significant issues detected.")
         else:
             for i, issue in enumerate(findings, 1):
-                # DEFENSIVE PARSING: Use .get() with safe defaults
-                severity = issue.get('severity', 'Medium')
-                category = issue.get('category', 'General')
-                title = issue.get('title', 'Unknown Issue')
-                desc = issue.get('description', 'No description provided.')
+                file_path = issue.get('file_path', issue.get('file', 'Unknown'))
+                func_name = issue.get('function_name', issue.get('function', 'Unknown'))
                 
-                severity_color = typer.colors.RED if severity == 'High' else typer.colors.YELLOW
+                # Check for line numbers existence
+                start = issue.get('start_line')
+                end = issue.get('end_line')
                 
-                typer.secho(f"{i}. [{category}] {title} (Severity: {severity})", fg=severity_color)
-                typer.echo(f"   {desc}\n")
+                # Construct line info string only if data exists
+                line_info = f" (Lines {start}-{end})" if (start and end) else ""
+                
+                typer.secho(f"{i}. [{issue.get('category', 'Technical Debt')}] {issue.get('title', 'Untitled')}", fg=typer.colors.RED)
+                typer.echo(f"   {file_path} -> {func_name}{line_info}")
+                typer.echo(f"   {issue.get('description', 'No description provided.')}\n")
         typer.echo("---------------------------\n")
+        
 
 
-        # 7. Prioritized Recommendations
+        # 8. Prioritized Recommendations
         typer.echo("Generating prioritized engineering recommendations...")
-        raw_recs = generate_recommendations(meta, analysis['stage'], health_scores, findings)
-        saved_recs = save_recommendations(db, repo_record.id, raw_recs)
+        
+        # Fetch the finding objects from the DB so we can enrich them
+        saved_findings_objects = db.query(Finding).filter(Finding.repository_id == repo_record.id).all()
+        
+        # Pass them to the newly updated AI prompt
+        raw_recs = generate_recommendations(meta, analysis['stage'], saved_findings_objects)
+        
+        # Save and map the links
+        saved_recs = save_recommendations(db, repo_record.id, raw_recs, saved_findings_objects)
         
         typer.secho("\n--- Engineering Recommendations ---", fg=typer.colors.GREEN)
         if not saved_recs:
@@ -144,7 +177,7 @@ def analyze(repository_url: str) -> None:
         else:
             for rec in saved_recs:
                 if rec.is_recommended:
-                    typer.secho(f"★ RECOMMENDED NEXT ACTION ★", fg=typer.colors.YELLOW, bold=True)
+                    typer.secho("★ RECOMMENDED NEXT ACTION ★", fg=typer.colors.YELLOW, bold=True)
                 
                 typer.secho(f"ID: {rec.id}", fg=typer.colors.CYAN)
                 typer.secho(f"Title: {rec.title}", bold=True)
@@ -164,64 +197,53 @@ def analyze(repository_url: str) -> None:
 
 @app.command()
 def audit(repository_url: str) -> None:
-
-    # Check for existing repo in DB to avoid re-cloning
+    """Run a fast, offline, deterministic AST audit without AI synthesis."""
     db = SessionLocal()
-    repo = db.query(Repository).filter(Repository.github_url == repository_url).first()
-    
-    if not repo or not Path(repo.local_path).exists():
-        typer.echo("Repo not found in local cache. Running analyze first...")
-        analyze(repository_url) # Re-use established ingestion logic
+    try:
+        # 1. Resolve Local Path
         repo = db.query(Repository).filter(Repository.github_url == repository_url).first()
-    
-    registry = []
-    repo_path = Path(repo.local_path)
-    typer.echo(f"Scanning repository files in: {repo_path}")
-    
-    for py_file in repo_path.rglob("*.py"):
-        # Skip virtual environments and hidden folders
-        if 'venv' in str(py_file) or '.git' in str(py_file) or 'node_modules' in str(py_file):
-            continue
-            
-        try:
-            # Get the registry for this specific file and add it to the master list
-            file_registry = get_function_registry(str(py_file))
-            registry.extend(file_registry)
-        except Exception as e:
-            continue # Skip unparseable files
-            
-    typer.echo(f"Discovered {len(registry)} functions. Calculating metrics...")
-    
-    # ... proceed with audit logic ...
-    
-    # 2. Metrics & Smell Detection (Phases 2 & 3)
-    all_findings = []
-    rules = load_rules() # Load rules.json
-    
-    for func in registry:
-        # Extract code slice using start/end lines
-        code_slice = get_code_slice(func['file'], func['start_line'], func['end_line'])
-        metrics = analyze_function_body(code_slice)
         
-        # Check against local rules.json
-        findings = evaluate_function(metrics, rules)
-        if findings:
-            all_findings.append({**func, **metrics, "findings": findings})
+        if not repo or not Path(repo.local_path).exists():
+            typer.echo("Repo not found in local cache. Cloning now...")
+            from repomind.loader import clone_repository
+            meta = clone_repository(repository_url)
+            local_path = meta["local_path"]
+        else:
+            # --- THE FIX: Cast the SQLAlchemy column to a string ---
+            local_path = str(repo.local_path)
             
-    # 3. Prioritization (Phase 8)
-    top_issues = get_top_issues(all_findings, limit=5)
-    
-    # 4. Synthesis (Phase 9)
-    typer.secho("\n--- High-Impact Findings (Manual Audit) ---", fg=typer.colors.RED)
-    for issue in top_issues:
-        typer.echo(f"Target: {issue['function']} in {issue['file']}")
-        typer.echo(f"Metrics: Complexity {issue['complexity']}, Nesting {issue['nesting']}")
+        # 2. Run the Engine
+        typer.echo(f"Executing deterministic AST code audit on: {local_path}...")
+        start_time = time.time()
+        raw_audit_findings = run_deterministic_audit(local_path)
+        execution_time = time.time() - start_time
         
-        explanation = generate_ai_explanation(issue) 
-        typer.echo(f"Refactor Logic: {explanation}\n")
+        # 3. Output the Math (No AI, just facts)
+        if not raw_audit_findings:
+            typer.secho(f"✓ No critical issues found in {execution_time:.2f} seconds.", fg=typer.colors.GREEN)
+            return
+            
+        # Sort by worst complexity
+        sorted_findings = sorted(raw_audit_findings, key=lambda x: x.get('complexity', 0), reverse=True)
         
-        # Add a 2-second pause between AI calls to respect API rate limits
-        time.sleep(2)
+        typer.secho(f"\n=== RAW AST AUDIT ({len(sorted_findings)} issues found in {execution_time:.2f}s) ===", fg=typer.colors.RED, bold=True)
+        
+        # Display the top 10 worst offenders
+        for i, issue in enumerate(sorted_findings[:10], 1):
+            typer.secho(f"{i}. {issue['function']} (File: {issue['file']})", fg=typer.colors.CYAN, bold=True)
+            typer.echo(f"   Complexity: {issue['complexity']} | Nesting: {issue['nesting']}")
+            violations = [f.get('type') for f in issue.get('findings', [])]
+            typer.secho(f"   Violations: {', '.join(violations)}\n", fg=typer.colors.YELLOW)
+            
+        if len(sorted_findings) > 10:
+            typer.echo(f"...and {len(sorted_findings) - 10} more issues.")
+            typer.secho("\nTip: Run `repomind analyze` to have the AI synthesize these findings into actionable refactoring blueprints.", fg=typer.colors.MAGENTA)
+            
+    except Exception as e:
+        typer.secho(f"Error during audit: {e}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    finally:
+        db.close()
 
 
 # ... (keep report, blueprint, and version commands the same as before) ...
@@ -278,15 +300,26 @@ def blueprint(recommendation_id: str, export: bool = typer.Option(False, "--expo
         typer.echo(f"Generating blueprint for: {rec.title}...")
 
         # 2. Generate and Save Blueprint
-        blueprint_data = generate_blueprint(str(rec.title), str(rec.description))
-        saved_bp = save_blueprint(db, rec.id, blueprint_data)
+        # Ensure we pass the language/framework constraints and the hard evidence!
+        repo_meta = {
+            "language": str(repo.language) if repo and repo.language else "Unknown",
+            "framework": str(repo.framework) if repo and repo.framework else "Unknown"
+        }
+        blueprint_data = generate_blueprint(
+            str(rec.title), 
+            str(rec.description), 
+            repo_meta, 
+            rec.linked_findings # Pass the joined DB evidence!
+        )
+        save_blueprint(db, rec.id, blueprint_data)
         
         # 3. Display the Output
         typer.secho("\n=== IMPLEMENTATION BLUEPRINT ===", fg=typer.colors.MAGENTA, bold=True)
         typer.echo(f"Goal: {blueprint_data.get('goal')}\n")
         
         typer.secho("Files to Create:", bold=True)
-        for f in blueprint_data.get('files_to_create', []): typer.echo(f"  + {f}")
+        for f in blueprint_data.get('files_to_create', []): 
+            typer.echo(f"  + {f}")
         
         typer.secho("\nImplementation Steps:", bold=True)
         for i, step in enumerate(blueprint_data.get('implementation_steps', []), 1):

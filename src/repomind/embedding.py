@@ -1,7 +1,5 @@
 from typing import List, Any, cast
 from sentence_transformers import SentenceTransformer 
-from sqlalchemy.orm import Session
-from repomind.models import Embedding
 # Our designated local model
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 _model = None
@@ -35,9 +33,3 @@ def generate_embeddings(texts: List[str]) -> List[List[float]]:
     # Convert numpy arrays to standard python lists for future database storage
     embeddings = model.encode(texts, normalize_embeddings=True)
     return cast(List[List[float]], embeddings.tolist())
-
-def get_relevant_chunks(db: Session, repo_id: Any, query: str, limit: int = 3):
-    query_vector = generate_embeddings([query])[0]
-    return db.query(Embedding).filter(Embedding.repository_id == repo_id)\
-        .order_by(Embedding.embedding.cosine_distance(query_vector))\
-        .limit(limit).all()
