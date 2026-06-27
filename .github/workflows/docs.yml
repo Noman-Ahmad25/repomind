@@ -3,7 +3,7 @@ name: Deploy Docs
 on:
   push:
     branches:
-      - feat-docs-enhanced-docs-website
+      - main
 
 permissions:
   contents: read
