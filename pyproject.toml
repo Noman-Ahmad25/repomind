@@ -10,11 +10,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "typer>=0.12.0",
-    "pydantic-settings>=2.0.0",
     "GitPython>=3.1.42",
     "tree-sitter>=0.22.0",
     "tree-sitter-python>=0.21.0",
-    "sentence-transformers>=2.5.0",
     "SQLAlchemy>=2.0.28",
     "psycopg[binary]>=3.1.18",
     "pgvector>=0.2.5",
@@ -31,6 +29,20 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.3.0",
     "mypy>=1.9.0",
+    "pytest-cov>=7.1.0",
+]
+
+[tool.pytest.ini_options]
+# Tell pytest to ONLY look in the "tests" directory
+testpaths = [
+    "tests",
+]
+# Tell pytest to completely ignore the  cloned repositories
+norecursedirs = [
+    "repositories",
+    ".git",
+    ".venv",
+    "venv"
 ]
 
 [tool.ruff]

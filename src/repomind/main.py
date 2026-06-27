@@ -3,15 +3,17 @@ import time
 from pathlib import Path
 from dotenv import load_dotenv
 
+import logging
+
 # Core Pipeline
 from repomind.loader import clone_repository, validate_github_url
 from repomind.parser import analyze_repository_structure
-from repomind.embedding import chunk_text, generate_embeddings
+
 
 # Database & Storage
 from repomind.database import SessionLocal
 from repomind.models import Repository, Embedding, RepositoryHealth, Finding, Recommendation
-from repomind.storage import save_repository, save_embeddings, save_health_scores, save_findings, save_recommendations, save_blueprint
+from repomind.storage import save_repository, save_health_scores, save_findings, save_recommendations, save_blueprint
 
 # Intelligence & Math
 from repomind.analyzer import run_deterministic_audit, calculate_deterministic_health, classify_maturity
@@ -25,13 +27,26 @@ from repomind.reporting import generate_analysis_markdown, generate_blueprint_ma
 # Load environment variables from .env file
 load_dotenv()
 
+# --- ADD THIS LOGGING CONFIGURATION ---
+logging.basicConfig(
+    filename="repomind.log",
+    filemode="a",
+    format="%(asctime)s - %(levelname)s - %(module)s - %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+# --------------------------------------
+
 app = typer.Typer(
     help="RepoMind AI - Repository Intelligence Platform",
     add_completion=False,
 )
 
 @app.command()
-def analyze(repository_url: str) -> None:
+def analyze(
+    repository_url: str,
+    rules: str = typer.Option("rules.json", "--rules", "-r", help="Path to custom rules configuration file")
+) -> None:
     """Analyze a repository and generate recommendations."""
     typer.echo(f"Initializing analysis for: {repository_url}")
     
@@ -64,56 +79,17 @@ def analyze(repository_url: str) -> None:
         typer.echo(f"Functions Found: {structure['functions']}")
         typer.echo("---------------------------\n")
 
-        # 3. Generate and Save Embeddings (Recursive for all source files)
-        # First, check if we already have data for this repository
-        existing_vectors = db.query(Embedding).filter(Embedding.repository_id == repo_record.id).count()
-        
-        if existing_vectors > 0:
-            typer.secho(f"✓ Found {existing_vectors} existing vectors in Postgres. Skipping re-embedding!", fg=typer.colors.YELLOW)
-        else:
-            typer.echo("Generating embeddings for repository source files...")
-            repo_root = Path(meta["local_path"])
-            extensions = ['*.py', '*.js', '*.ts', '*.md']
-            
-            files_to_process = []
-            for ext in extensions:
-                for file_path in repo_root.rglob(ext):
-                    if 'venv' in str(file_path) or 'node_modules' in str(file_path) or '.git' in str(file_path):
-                        continue
-                    files_to_process.append(file_path)
-            
-            total_vectors = 0
-            with typer.progressbar(files_to_process, label="Vectorizing codebase") as progress:
-                for file_path in progress:
-                    try:
-                        content = file_path.read_text(encoding="utf-8")
-                        chunks = chunk_text(content)
-                        if chunks:
-                            vectors = generate_embeddings(chunks)
-                            save_embeddings(db, repo_record.id, str(file_path.relative_to(repo_root)), chunks, vectors)
-                            total_vectors += len(chunks)
-                    except Exception:
-                        pass
-                        
-            typer.secho(f"\n✓ Saved {total_vectors} vectors to Postgres (pgvector)!", fg=typer.colors.GREEN)
 
-        # # 4. AI Stage Detection
-        # typer.echo("Executing AI Stage Detection via Gemini 2.5 Pro...")
-        # analysis = detect_repository_stage(meta, structure)
-        
-        # typer.secho("\n--- Intelligence Report ---", fg=typer.colors.MAGENTA)
-        # typer.echo(f"Detected Stage: {analysis['stage']}")
-        # typer.echo(f"Confidence Score: {analysis['confidence']}%")
-        # typer.echo(f"Architectural Reasoning: {analysis['reasoning']}")
-        # typer.echo("---------------------------\n")
-        
        # ---------------------------------------------------------
         # --- PHASE 6: THE PIPELINE FLIP (Evidence First) ---
         # ---------------------------------------------------------
 
-        # 5. Deterministic AST Audit (Moved up!)
-        typer.echo("Executing deterministic AST code audit...")
-        raw_audit_findings = run_deterministic_audit(meta["local_path"])
+        # 4. Deterministic AST Audit
+        typer.echo(f"Executing deterministic AST code audit using rules from {rules}...")
+        raw_audit_findings = run_deterministic_audit(meta["local_path"], rules_path=rules)
+        
+        # 5. Deterministic Repository Stage Classification
+        typer.echo("Classifying repository maturity...")
         analysis = classify_maturity(structure)
         
         # 6. Evidence-Based Health Scores (No AI used here!)
@@ -121,7 +97,8 @@ def analyze(repository_url: str) -> None:
         health_scores = calculate_deterministic_health(structure, raw_audit_findings)
         save_health_scores(db, repo_record.id, health_scores)
         
-        typer.secho("\n--- Health Report (Evidence-Based) ---", fg=typer.colors.BLUE)
+        typer.secho("\n--- Health & Intelligence Report (Evidence-Based) ---", fg=typer.colors.BLUE)
+        typer.echo(f"Detected Stage: {analysis.get('stage', 'Unknown')}")
         typer.echo(f"Architecture:  {health_scores['architecture_score']}/100")
         typer.echo(f"Testing:       {health_scores['testing_score']}/100")
         typer.echo(f"Security:      {health_scores['security_score']}/100")
@@ -189,6 +166,8 @@ def analyze(repository_url: str) -> None:
        
             
     except Exception as e:
+        # FIX: Log the full stack trace to the file, but keep the terminal clean
+        logger.error(f"Analysis failed for {repository_url}", exc_info=True)
         typer.secho(f"Error analyzing repository: {e}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
     finally:
@@ -196,7 +175,11 @@ def analyze(repository_url: str) -> None:
 
 
 @app.command()
-def audit(repository_url: str) -> None:
+@app.command()
+def audit(
+    repository_url: str,
+    rules: str = typer.Option("rules.json", "--rules", "-r", help="Path to custom rules configuration file")
+) -> None:
     """Run a fast, offline, deterministic AST audit without AI synthesis."""
     db = SessionLocal()
     try:
@@ -213,9 +196,9 @@ def audit(repository_url: str) -> None:
             local_path = str(repo.local_path)
             
         # 2. Run the Engine
-        typer.echo(f"Executing deterministic AST code audit on: {local_path}...")
+        typer.echo(f"Executing deterministic AST code audit on: {local_path} using {rules}...")
         start_time = time.time()
-        raw_audit_findings = run_deterministic_audit(local_path)
+        raw_audit_findings = run_deterministic_audit(local_path, rules_path=rules)
         execution_time = time.time() - start_time
         
         # 3. Output the Math (No AI, just facts)
@@ -240,6 +223,7 @@ def audit(repository_url: str) -> None:
             typer.secho("\nTip: Run `repomind analyze` to have the AI synthesize these findings into actionable refactoring blueprints.", fg=typer.colors.MAGENTA)
             
     except Exception as e:
+        logger.error(f"Audit failed for recommendation {repository_url}", exc_info=True)
         typer.secho(f"Error during audit: {e}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
     finally:
@@ -275,6 +259,7 @@ def report(repository_url: str) -> None:
         typer.secho(f"✓ Report successfully exported to: {filepath}", fg=typer.colors.GREEN, bold=True)
         
     except Exception as e:
+        logger.error(f"Report generation failed for Repository {repository_url}", exc_info=True)
         typer.secho(f"Error generating report: {e}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
     finally:
@@ -336,6 +321,7 @@ def blueprint(recommendation_id: str, export: bool = typer.Option(False, "--expo
             typer.secho(f"✓ Blueprint successfully exported to: {filepath}", fg=typer.colors.GREEN, bold=True)
 
     except Exception as e:
+        logger.error(f"Blueprint generation failed for recommendation {recommendation_id}", exc_info=True)
         typer.secho(f"Error generating blueprint: {e}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
     finally:

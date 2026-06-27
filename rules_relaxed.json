@@ -1,0 +1,13 @@
+{
+  "metrics": {
+    "loc": { "warning": 100, "critical": 150 },
+    "nesting": { "warning": 5, "critical": 7 },
+    "complexity": { "warning": 15, "critical": 30 },
+    "params": { "warning": 6, "critical": 10 },
+    "file_length": {"critical": 2000}
+  },
+  "patterns": {
+    "broad_exceptions": ["BaseException"],
+    "empty_exceptions": ["pass"]
+  }
+}

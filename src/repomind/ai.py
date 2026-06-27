@@ -247,7 +247,10 @@ def generate_blueprint(
         "files_to_create": ["List of new file paths"],
         "files_to_modify": ["List of existing files to change"],
         "estimated_effort": "e.g., 2 weeks, 3 days",
-        "implementation_steps": ["Step 1:...", "Step 2:..."]
+        "implementation_steps": ["Step 1:...", "Step 2:..."],
+        "validation_checklist": ["List of specific tests/checks to ensure the refactor works"],
+        "rollback_strategy": "Clear instructions on how to safely revert this change if it fails in production",
+        "migration_steps": ["Data or state migration steps, if any. Otherwise ['None required']"]
     }}
     """
     

@@ -24,6 +24,10 @@ def analyze_repository_structure(local_path: str) -> Dict[str, int]:
     
     # Scan all Python files in the cloned repository
     for py_file in repo_dir.rglob("*.py"):
+        # FIX: Exclude virtual environments and package directories
+        if 'venv' in str(py_file) or '.git' in str(py_file) or 'node_modules' in str(py_file):
+            continue
+            
         file_count += 1
         try:
             content = py_file.read_bytes()
@@ -34,7 +38,7 @@ def analyze_repository_structure(local_path: str) -> Dict[str, int]:
         except Exception:
             # Skip unparseable files safely
             continue
-            
+        
     return {
         "files": file_count,
         "classes": class_count,

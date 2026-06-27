@@ -67,13 +67,13 @@ def get_code_slice(file_path: str, start_line: int, end_line: int) -> str:
         return ""
     
 
-def run_deterministic_audit(local_path: str) -> list[dict[str, Any]]:
+def run_deterministic_audit(local_path: str, rules_path: str = "rules.json") -> list[dict[str, Any]]:
     """Recursively parses files, catches God Files, and evaluates function ASTs."""
     registry: list[dict[str, Any]] = []
     repo_dir = Path(local_path)
     
-    # Load rules once at the start of the audit
-    rules = load_rules() 
+    # FIX: Load rules dynamically based on the passed path
+    rules = load_rules(rules_path)
     file_length_limit = rules.get("metrics", {}).get("file_length", {}).get("critical", 1000)
     
     all_findings = []
