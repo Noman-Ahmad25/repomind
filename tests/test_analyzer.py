@@ -1,7 +1,7 @@
 import ast
 from repomind.analyzer_metrics import FunctionAnalyzer
 
-def test_function_complexity_and_nesting():
+def test_function_complexity_and_nesting() -> None:
     """Ensure the AST analyzer correctly counts complexity and nesting depth."""
     
     # A fake python function with 1 loop and 1 nested if (Complexity: 3, Nesting: 2)
