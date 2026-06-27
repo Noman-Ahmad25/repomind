@@ -1,132 +1,176 @@
+import type { Metadata } from "next";
+
+import { Callout, CodeBlock, PageHeader, Section } from "@/components/docs";
+
+export const metadata: Metadata = {
+  title: "Installation",
+  description:
+    "Install RepoMind with the recommended Docker Compose workflow or a manual Python and PostgreSQL setup.",
+};
+
+const cloneCommands = `git clone https://github.com/Noman-Ahmad25/repomind.git
+cd repomind`;
+
+const envDocker = `GEMINI_API_KEY=your_gemini_api_key`;
+
+const dockerStart = `docker compose up -d app`;
+
+const dockerMigrate = `docker compose exec app alembic upgrade head`;
+
+const dockerVerify = `docker compose exec app repomind analyze https://github.com/fastapi/fastapi --rules rules_relaxed.json`;
+
+const dockerAudit = `docker compose exec app repomind audit https://github.com/fastapi/fastapi --rules rules_relaxed.json`;
+
+const envLocal = `GEMINI_API_KEY=your_gemini_api_key
+DATABASE_URL=postgresql+psycopg://postgres:password@localhost:5432/repomind`;
+
+const localInstall = `uv sync
+uv run alembic upgrade head`;
+
+const localVerify = `uv run repomind analyze https://github.com/fastapi/fastapi --rules rules_relaxed.json`;
 
 export default function InstallationPage() {
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <h1 className="text-4xl font-bold tracking-tight text-white mb-4">
-        Installation
-      </h1>
+    <div className="space-y-10">
+      <PageHeader
+        eyebrow="Getting Started"
+        title="Installation"
+        description={
+          <>
+            Docker Compose is the recommended way to run RepoMind because it
+            starts the CLI environment and the PostgreSQL + pgvector knowledge
+            store with one workflow.
+          </>
+        }
+      />
 
-      <p className="text-zinc-400 text-lg leading-relaxed">
-        RepoMind requires <strong className="text-zinc-200">Python 3.12+</strong>,
-        <strong className="text-zinc-200"> Docker</strong> (for PostgreSQL +
-        pgvector), and the <code>uv</code> package manager.
-      </p>
+      <Callout title="Recommended path" variant="tip">
+        Use Docker first unless you are actively developing RepoMind itself. The
+        Compose setup wires the app container to the database using the service
+        hostname <code className="text-zinc-100">db</code>.
+      </Callout>
 
-      <div className="mt-8 space-y-10">
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            1. Clone the Repository
-          </h2>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-md p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-            git clone https://github.com/yourusername/repomind.git
-            <br />
-            cd repomind
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            2. Install Dependencies
-          </h2>
-
-          <p className="text-zinc-400 mb-3">
-            Install all project dependencies using{" "}
-            <code className="text-zinc-200">uv</code>.
-          </p>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-md p-4 font-mono text-sm text-zinc-300">
-            uv sync
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            3. Start PostgreSQL
-          </h2>
-
-          <p className="text-zinc-400 mb-3">
-            RepoMind uses PostgreSQL 16 with the pgvector extension running inside
-            Docker. Start the database with:
-          </p>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-md p-4 font-mono text-sm text-zinc-300">
-            docker compose up -d
-          </div>
-
-          <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <h3 className="text-zinc-100 font-semibold mb-3">
-              Default Database Configuration
+      <Section
+        title="Docker Installation"
+        description="Start here for the most repeatable setup."
+      >
+        <div className="space-y-6">
+          <div>
+            <h3 className="mb-3 font-semibold text-zinc-100">
+              1. Clone RepoMind
             </h3>
-
-            <div className="grid grid-cols-2 gap-y-2 text-sm">
-              <span className="text-zinc-500">Image</span>
-              <span className="text-zinc-200">
-                pgvector/pgvector:pg16
-              </span>
-
-              <span className="text-zinc-500">Database</span>
-              <span className="text-zinc-200">repomind</span>
-
-              <span className="text-zinc-500">Username</span>
-              <span className="text-zinc-200">postgres</span>
-
-              <span className="text-zinc-500">Password</span>
-              <span className="text-zinc-200">password</span>
-
-              <span className="text-zinc-500">Port</span>
-              <span className="text-zinc-200">5432</span>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            4. Run Database Migrations
-          </h2>
-
-          <p className="text-zinc-400 mb-3">
-            Create the required database schema.
-          </p>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-md p-4 font-mono text-sm text-zinc-300">
-            uv run alembic upgrade head
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            5. Configure Environment
-          </h2>
-
-          <p className="text-zinc-400 mb-3">
-            Create a <code>.env</code> file and add your Gemini API key.
-          </p>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-md p-4 font-mono text-sm text-zinc-300">
-            GEMINI_API_KEY=your_api_key
+            <CodeBlock title="clone" code={cloneCommands} />
           </div>
 
-          <div className="mt-4 rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-4">
-            <p className="text-sm text-zinc-300">
-              <strong className="text-white">Note:</strong> Docker starts the
-              PostgreSQL database automatically. RepoMind connects to the running
-              database using the project's configuration, so no additional Docker
-              setup is required after the container is running.
+          <div>
+            <h3 className="mb-3 font-semibold text-zinc-100">
+              2. Configure Gemini
+            </h3>
+            <p className="mb-3 text-zinc-400">
+              Create a <code className="text-zinc-200">.env</code> file in the
+              project root. Docker provides the container database URL from
+              <code className="text-zinc-200"> docker-compose.yml</code>.
             </p>
+            <CodeBlock title=".env" code={envDocker} language="env" />
           </div>
-        </section>
 
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            6. Verify Installation
-          </h2>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-md p-4 font-mono text-sm text-green-400">
-            uv run repomind analyze https://github.com/fastapi/fastapi
+          <div>
+            <h3 className="mb-3 font-semibold text-zinc-100">
+              3. Start the app service
+            </h3>
+            <CodeBlock title="docker" code={dockerStart} />
           </div>
-        </section>
-      </div>
+
+          <div>
+            <h3 className="mb-3 font-semibold text-zinc-100">
+              4. Run migrations
+            </h3>
+            <p className="mb-3 text-zinc-400">
+              Create the repository, health, findings, recommendations, and
+              blueprint tables before the first analysis.
+            </p>
+            <CodeBlock title="database" code={dockerMigrate} />
+          </div>
+
+          <div>
+            <h3 className="mb-3 font-semibold text-zinc-100">
+              5. Verify the installation
+            </h3>
+            <CodeBlock title="analyze" code={dockerVerify} />
+          </div>
+
+          <Callout title="Run commands inside the container">
+            Prefix CLI commands with{" "}
+            <code className="text-zinc-100">docker compose exec app</code> when
+            using Docker. For example:
+          </Callout>
+
+          <CodeBlock title="audit" code={dockerAudit} />
+        </div>
+      </Section>
+
+      <Section
+        title="Docker Configuration"
+        description="The Compose file defines a PostgreSQL 16 database with pgvector and an app service that mounts the repository."
+      >
+        <div className="overflow-hidden rounded-lg border border-zinc-800">
+          <div className="grid grid-cols-2 gap-px bg-zinc-800 text-sm">
+            {[
+              ["Database image", "pgvector/pgvector:pg16"],
+              ["Database name", "repomind"],
+              ["Username", "postgres"],
+              ["Password", "password"],
+              ["Host port", "5432"],
+              [
+                "Container DATABASE_URL",
+                "postgresql+psycopg://postgres:password@db:5432/repomind",
+              ],
+            ].map(([label, value]) => (
+              <div key={label} className="contents">
+                <div className="bg-zinc-900 px-4 py-3 text-zinc-500">
+                  {label}
+                </div>
+                <div className="bg-zinc-900 px-4 py-3 text-zinc-200">
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="Manual Installation"
+        description="Use this setup when you want to run the CLI directly on your host machine."
+      >
+        <div className="space-y-6">
+          <Callout title="Manual prerequisites" variant="warning">
+            Manual mode requires Python 3.12+, uv, Git, PostgreSQL with pgvector,
+            and a reachable database URL.
+          </Callout>
+
+          <div>
+            <h3 className="mb-3 font-semibold text-zinc-100">
+              1. Install dependencies and run migrations
+            </h3>
+            <CodeBlock title="local setup" code={localInstall} />
+          </div>
+
+          <div>
+            <h3 className="mb-3 font-semibold text-zinc-100">
+              2. Configure environment variables
+            </h3>
+            <CodeBlock title=".env" code={envLocal} language="env" />
+          </div>
+
+          <div>
+            <h3 className="mb-3 font-semibold text-zinc-100">
+              3. Run RepoMind locally
+            </h3>
+            <CodeBlock title="analyze" code={localVerify} />
+          </div>
+        </div>
+      </Section>
     </div>
   );
 }

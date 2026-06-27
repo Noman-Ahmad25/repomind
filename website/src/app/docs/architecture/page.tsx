@@ -1,184 +1,174 @@
+import type { Metadata } from "next";
+import {
+  Brain,
+  Database,
+  FileText,
+  GitBranch,
+  Gauge,
+  Layers,
+  Route,
+  ShieldCheck,
+  Sparkles,
+  Terminal,
+} from "lucide-react";
+
+import {
+  Callout,
+  FeatureCard,
+  PageHeader,
+  Section,
+  WorkflowFlow,
+} from "@/components/docs";
+
+export const metadata: Metadata = {
+  title: "Architecture",
+  description:
+    "RepoMind architecture from repository clone through AST analysis, rule evaluation, health scoring, PostgreSQL, AI recommendations, blueprints, and reports.",
+};
+
+const architectureSteps = [
+  {
+    title: "Repository",
+    description: "A public or private GitHub repository URL is the pipeline input.",
+    icon: GitBranch,
+  },
+  {
+    title: "Clone",
+    description:
+      "RepoMind validates the GitHub URL, clones the repository, and caches it under repositories/.",
+    icon: Terminal,
+  },
+  {
+    title: "AST Engine",
+    description:
+      "The scanner routes supported files to deterministic analyzers and extracts structure without executing project code.",
+    icon: Layers,
+  },
+  {
+    title: "Rule Engine",
+    description:
+      "Rule profiles evaluate complexity, nesting, exception handling, unused imports, and large-file signals.",
+    icon: ShieldCheck,
+  },
+  {
+    title: "Health Score Engine",
+    description:
+      "Architecture, testing, security, documentation, scalability, and overall scores are calculated from metrics.",
+    icon: Gauge,
+  },
+  {
+    title: "PostgreSQL",
+    description:
+      "Repository metadata, health reports, findings, recommendations, blueprints, and vector data are persisted locally.",
+    icon: Database,
+  },
+  {
+    title: "AI Layer",
+    description:
+      "Gemini synthesizes engineering issues and plans only after deterministic evidence exists.",
+    icon: Brain,
+  },
+  {
+    title: "Recommendations",
+    description:
+      "RepoMind ranks engineering actions by priority, impact, effort, and linked findings.",
+    icon: Sparkles,
+  },
+  {
+    title: "Blueprints",
+    description:
+      "A recommendation ID can become a concrete implementation plan for code changes.",
+    icon: Route,
+  },
+  {
+    title: "Reports",
+    description:
+      "Markdown exports capture health, findings, recommendations, and blueprint artifacts.",
+    icon: FileText,
+  },
+];
+
 export default function ArchitecturePage() {
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <h1 className="text-4xl font-bold tracking-tight text-white mb-4">
-        System Architecture
-      </h1>
+    <div className="space-y-10">
+      <PageHeader
+        eyebrow="Concepts"
+        title="System Architecture"
+        description={
+          <>
+            RepoMind follows an evidence-first architecture. Deterministic
+            metrics are collected before AI is used for issue synthesis,
+            prioritization, and implementation planning.
+          </>
+        }
+      />
 
-      <p className="text-zinc-400 text-lg leading-relaxed">
-        RepoMind follows an <strong className="text-zinc-200">evidence-first architecture</strong>.
-        Repository metrics are gathered through deterministic static analysis before
-        AI is used to synthesize engineering recommendations and implementation
-        blueprints.
-      </p>
+      <Section
+        title="End-to-End Pipeline"
+        description="The architecture moves from source evidence to persisted intelligence and shareable outputs."
+      >
+        <WorkflowFlow steps={architectureSteps} />
+      </Section>
 
-      <section className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900 p-6 overflow-x-auto">
-        <pre className="text-sm text-zinc-300 leading-7">
-{`                    Git Repository
-                           │
-                           ▼
-                  Repository Loader
-                           │
-                           ▼
-                  Repository Parser
-                           │
-                           ▼
-               Deterministic AST Engine
-                           │
-      ┌────────────────────┼────────────────────┐
-      │                    │                    │
-      ▼                    ▼                    ▼
- Complexity Analysis   Security Analysis   God File Detection
-      │                    │                    │
-      └────────────────────┼────────────────────┘
-                           │
-                           ▼
-           Evidence-Based Health Scoring
-                           │
-                ┌──────────┴──────────┐
-                ▼                     ▼
-        PostgreSQL Metadata     pgvector Embeddings
-             (Docker)               (Docker)
-                │                     │
-                └──────────┬──────────┘
-                           ▼
-             AI Engineering Intelligence
-                           │
-                           ▼
-          Recommendations & Blueprints`}
-        </pre>
-      </section>
+      <Section title="Core Layers">
+        <div className="grid gap-4 md:grid-cols-2">
+          <FeatureCard icon={GitBranch} title="Repository Layer">
+            Validates GitHub URLs, clones repositories, updates cached working
+            copies, and records owner/name metadata for downstream reporting.
+          </FeatureCard>
+          <FeatureCard icon={Layers} title="Deterministic Analysis Layer">
+            Performs single-pass scanning and Python AST analysis for functions,
+            imports, complexity, nesting, and exception-handling patterns.
+          </FeatureCard>
+          <FeatureCard icon={Database} title="Knowledge Layer">
+            Stores repositories, health scores, findings, recommendations,
+            blueprints, and vector-ready repository intelligence in PostgreSQL.
+          </FeatureCard>
+          <FeatureCard icon={Brain} title="AI Engineering Layer">
+            Uses deterministic findings as input to generate issue summaries,
+            prioritized recommendations, and implementation blueprints.
+          </FeatureCard>
+        </div>
+      </Section>
 
-      <div className="mt-10 space-y-10">
-
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            1. Repository Layer
-          </h2>
-
-          <p className="text-zinc-400 mb-4">
-            RepoMind begins by cloning the target repository and extracting
-            structural metadata without executing application code.
-          </p>
-
-          <ul className="list-disc list-inside text-zinc-400 space-y-2 ml-4">
-            <li>
-              <strong className="text-zinc-200">GitPython</strong> clones and
-              manages repositories.
-            </li>
-            <li>
-              Repository metadata including files, classes, and functions is
-              collected for further analysis.
-            </li>
-          </ul>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            2. Deterministic Analysis Engine
-          </h2>
-
-          <p className="text-zinc-400 mb-4">
-            RepoMind performs deterministic static analysis using Python AST.
-            Engineering metrics are calculated locally without relying on AI.
-          </p>
-
-          <ul className="list-disc list-inside text-zinc-400 space-y-2 ml-4">
-            <li>Cyclomatic complexity analysis</li>
-            <li>Nesting depth analysis</li>
-            <li>Broad exception detection</li>
-            <li>Empty exception detection</li>
-            <li>God File detection</li>
-            <li>Repository health scoring</li>
-          </ul>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            3. Knowledge Layer
-          </h2>
-
-          <p className="text-zinc-400 mb-4">
-            Repository intelligence is persisted locally using Dockerized
-            PostgreSQL with the pgvector extension.
-          </p>
-
-          <ul className="list-disc list-inside text-zinc-400 space-y-2 ml-4">
-            <li>Repository metadata</li>
-            <li>Health reports</li>
-            <li>Engineering findings</li>
-            <li>Semantic vector embeddings</li>
-            <li>Recommendation history</li>
-          </ul>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            4. AI Engineering Intelligence
-          </h2>
-
-          <p className="text-zinc-400 mb-4">
-            AI is applied only after deterministic analysis has produced
-            evidence-backed findings.
-          </p>
-
-          <ul className="list-disc list-inside text-zinc-400 space-y-2 ml-4">
-            <li>Repository maturity classification</li>
-            <li>Engineering recommendation generation</li>
-            <li>Implementation blueprint generation</li>
-            <li>Structured JSON responses validated using Pydantic</li>
-          </ul>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            Design Principles
-          </h2>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-              <h3 className="font-semibold text-zinc-100 mb-2">
-                Evidence First
-              </h3>
-              <p className="text-sm text-zinc-400">
-                Repository metrics are produced through deterministic analysis
-                before AI reasoning begins.
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-              <h3 className="font-semibold text-zinc-100 mb-2">
-                Local by Default
-              </h3>
-              <p className="text-sm text-zinc-400">
-                Static analysis, vector generation, and database storage all run
-                locally.
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-              <h3 className="font-semibold text-zinc-100 mb-2">
-                Deterministic
-              </h3>
-              <p className="text-sm text-zinc-400">
-                Health scores are computed mathematically rather than generated
-                by an LLM.
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-              <h3 className="font-semibold text-zinc-100 mb-2">
-                AI-Assisted
-              </h3>
-              <p className="text-sm text-zinc-400">
-                AI focuses on engineering reasoning, prioritization, and
-                blueprint generation instead of static code analysis.
-              </p>
-            </div>
+      <Section title="Design Principles">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+            <h3 className="font-semibold text-zinc-100">Evidence First</h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">
+              Static analysis and rule evaluation happen before AI reasoning.
+              Recommendations are grounded in collected repository evidence.
+            </p>
           </div>
-        </section>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+            <h3 className="font-semibold text-zinc-100">Local by Default</h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">
+              The repository cache, deterministic analysis, database, reports,
+              and blueprint exports all run from the developer environment.
+            </p>
+          </div>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+            <h3 className="font-semibold text-zinc-100">Repeatable Scoring</h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">
+              Health scores are mathematical outputs from the same metrics and
+              rule profile, making runs comparable over time.
+            </p>
+          </div>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+            <h3 className="font-semibold text-zinc-100">AI After Analysis</h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">
+              AI is used for synthesis, prioritization, and planning rather than
+              as the primary source of static-analysis truth.
+            </p>
+          </div>
+        </div>
+      </Section>
 
-      </div>
+      <Callout title="Why PostgreSQL sits before AI">
+        RepoMind persists repository evidence before synthesis so reports,
+        recommendations, and blueprints can be traced back to saved findings
+        instead of a one-off prompt response.
+      </Callout>
     </div>
   );
 }

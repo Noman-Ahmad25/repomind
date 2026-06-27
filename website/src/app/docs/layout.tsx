@@ -1,47 +1,59 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { Download, Rocket, GitBranch } from "lucide-react";
+import type { ReactNode } from "react";
+import { Cpu, GitBranch } from "lucide-react";
 
-export default function DocsLayout({ children }: { children: React.ReactNode }) {
+import { DocsPager } from "@/components/docs-pager";
+import { DocsSidebar } from "@/components/docs-sidebar";
+
+export const metadata: Metadata = {
+  title: "Documentation",
+  description:
+    "RepoMind documentation for installation, CLI commands, rule profiles, configuration, architecture, workflow, health scoring, examples, FAQ, and roadmap.",
+  openGraph: {
+    title: "RepoMind Documentation",
+    description:
+      "Production documentation for RepoMind repository intelligence workflows.",
+    url: "/docs/quick-start",
+  },
+};
+
+export default function DocsLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50 flex flex-col pt-16">
-      <div className="max-w-7xl mx-auto w-full px-6 flex-1 flex flex-col md:flex-row">
-        
-        {/* Sidebar Navigation */}
-        <aside className="w-full md:w-64 py-8 md:pr-8 border-b md:border-b-0 md:border-r border-zinc-800">
-          <nav className="space-y-6 sticky top-24">
-            <div>
-              <h4 className="font-semibold text-zinc-100 mb-3 px-2">Getting Started</h4>
-              <ul className="space-y-1 text-sm text-zinc-400">
-                <li>
-                  <Link href="/docs/installation" className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-zinc-900 hover:text-white transition-colors">
-                    <Download className="w-4 h-4" /> Installation
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/docs/quick-start" className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-zinc-900 hover:text-white transition-colors">
-                    <Rocket className="w-4 h-4" /> Quick Start
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-zinc-100 mb-3 px-2">Core Concepts</h4>
-              <ul className="space-y-1 text-sm text-zinc-400">
-                <li>
-                  <Link href="/docs/architecture" className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-zinc-900 hover:text-white transition-colors">
-                    <GitBranch className="w-4 h-4" /> Architecture
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </nav>
-        </aside>
+    <div className="min-h-screen bg-zinc-950 text-zinc-50">
+      <nav className="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/75 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+          <Link href="/" className="flex items-center gap-2 font-bold text-lg">
+            <Cpu className="h-5 w-5 text-indigo-500" />
+            <span>RepoMind</span>
+          </Link>
 
-        {/* Main Content Area */}
-        <main className="flex-1 py-8 md:pl-12 max-w-3xl">
-          {children}
+          <div className="flex items-center gap-5 text-sm text-zinc-400">
+            <Link href="/docs/quick-start" className="text-white">
+              Docs
+            </Link>
+            <a
+              href="https://github.com/Noman-Ahmad25/repomind"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 transition hover:text-white"
+            >
+              <GitBranch className="h-4 w-4" />
+              GitHub
+            </a>
+          </div>
+        </div>
+      </nav>
+
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-6 md:flex-row">
+        <DocsSidebar />
+
+        <main className="w-full max-w-4xl flex-1 py-8 md:pl-12">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {children}
+            <DocsPager />
+          </div>
         </main>
-        
       </div>
     </div>
   );
