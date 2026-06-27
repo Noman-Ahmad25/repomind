@@ -1,36 +1,36 @@
-name: Run Pytest with uv
+name: Quality Checks
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [main, dev]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  test:
+  quality:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Clone the repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up uv package manager and activate built-in caching
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
-          enable-cache: true     # Automatically handles and persists your uv package cache
+          enable-cache: true
 
-      # Step 3: Set up your specified Python version using uv
       - name: Set up Python
-        run: uv python install 3.11  # Automatically fetches and uses isolated Python
+        run: uv python install 3.12
 
-      # Step 4: Sync your project environment 
-      # (Reads your pyproject.toml or uv.lock and installs dependencies instantly)
       - name: Install Dependencies
         run: uv sync --frozen
 
-      # Step 5: Run Pytest securely inside the managed environment
-      - name: Run Pytest Suite
-        run: uv run pytest --verbose
+      - name: Run Ruff
+        run: uv run ruff check .
+
+      - name: Run mypy
+        run: uv run mypy .
+
+      - name: Run Pytest
+        run: uv run pytest -v

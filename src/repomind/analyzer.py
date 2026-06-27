@@ -1,8 +1,5 @@
 from tree_sitter import Language, Parser, Node
 import tree_sitter_python as tspython
-from pathlib import Path
-from repomind.analyzer_metrics import analyze_function_body
-from repomind.validator import load_rules, evaluate_function
 from typing import Any
 
 # Load the language once for efficiency
@@ -66,54 +63,6 @@ def get_code_slice(file_path: str, start_line: int, end_line: int) -> str:
     except Exception:
         return ""
     
-
-def run_deterministic_audit(local_path: str, rules_path: str = "rules.json") -> list[dict[str, Any]]:
-    """Recursively parses files, catches God Files, and evaluates function ASTs."""
-    registry: list[dict[str, Any]] = []
-    repo_dir = Path(local_path)
-    
-    # FIX: Load rules dynamically based on the passed path
-    rules = load_rules(rules_path)
-    file_length_limit = rules.get("metrics", {}).get("file_length", {}).get("critical", 1000)
-    
-    all_findings = []
-    
-    for py_file in repo_dir.rglob("*.py"):
-        if 'venv' in str(py_file) or '.git' in str(py_file) or 'node_modules' in str(py_file):
-            continue
-            
-        try:
-            # --- NEW: Catch God Files ---
-            with open(py_file, 'r', encoding='utf-8') as f:
-                line_count = sum(1 for _ in f)
-                
-            if line_count > file_length_limit:
-                all_findings.append({
-                    "file": str(py_file),
-                    "function": "Entire Module", # Flags the whole file
-                    # We store line count as 'complexity' so main.py sorts it to the top
-                    "complexity": line_count, 
-                    "nesting": 0,
-                    "findings": [{"type": "GOD_FILE", "severity": "High"}]
-                })
-
-            # Continue with normal function extraction
-            file_registry = get_function_registry(str(py_file))
-            registry.extend(file_registry)
-        except Exception:
-            continue
-            
-    for func in registry:
-        code_slice = get_code_slice(func['file'], func['start_line'], func['end_line'])
-        metrics = analyze_function_body(code_slice)
-        findings = evaluate_function(metrics, rules)
-        
-        if findings:
-            all_findings.append({**func, **metrics, "findings": findings})
-            
-    return all_findings
-
-
 def calculate_deterministic_health(structure: dict[str, int], findings: list[dict[str, Any]]) -> dict[str, int]:
     """Calculate repository health scores purely from AST metrics and structure."""
     
@@ -164,9 +113,13 @@ def classify_maturity(structure: dict[str, int]) -> dict[str, Any]:
     f = structure.get('files', 0)
     func = structure.get('functions', 0)
     
-    if f < 20: stage = "Idea/Prototype"
-    elif f < 100: stage = "MVP"
-    elif f < 500: stage = "Growth"
-    else: stage = "Mature"
+    if f < 20: 
+        stage = "Idea/Prototype"
+    elif f < 100: 
+        stage = "MVP"
+    elif f < 500: 
+        stage = "Growth"
+    else: 
+        stage = "Mature"
     
     return {"stage": stage, "confidence": 100, "reasoning": f"Calculated from {f} files and {func} functions."}

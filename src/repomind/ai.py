@@ -6,6 +6,16 @@ from google.genai import types
 from repomind.analyzer import get_code_slice
 
 
+GROUNDING_RULES = """
+You are a repository review assistant operating on deterministic evidence only.
+Use only the repository facts supplied in this prompt: metadata, AST findings, code snippets, metrics, and file or function names.
+Never invent files, functions, classes, frameworks, dependencies, architectures, metrics, line numbers, or repository structure.
+If a detail is not present in the supplied evidence, state that it is not provided rather than infer it.
+Do not speculate about runtime behavior, security posture, business domain, or architecture beyond the evidence.
+Use concise technical language and return only machine-parseable JSON when requested.
+"""
+
+
 def detect_repository_stage(repo_meta: Dict[str, str], structure: Dict[str, int]) -> Dict[str, Any]:
     """Analyze repository metadata to determine its maturity stage."""
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -17,31 +27,25 @@ def detect_repository_stage(repo_meta: Dict[str, str], structure: Dict[str, int]
     # Using flash temporarily to bypass the strict free-tier limits on Pro
     model_name = 'gemini-3.1-flash-lite'
     
-    rules = """
-    You are an expert Software Architect. Evaluate the repository architecture metrics and classify its maturity stage into EXACTLY ONE of the following:
-    - Idea: Minimal code, mostly documentation.
-    - Prototype: Basic structure, functional but lacks extensive architecture.
-    - MVP: Core features implemented, moderate file/function count.
-    - Growth: Scaling architecture, high file count, complex module separation.
-    - Mature: Enterprise-ready, massive codebase, highly optimized.
-    """
-    
     prompt = f"""
-    {rules}
-    
-    Repository Data:
-    - Name: {repo_meta['name']}
-    - Total Files: {structure['files']}
-    - Total Classes: {structure['classes']}
-    - Total Functions: {structure['functions']}
-    
-    Respond ONLY with a valid JSON object matching this exact schema:
-    {{
-        "stage": "Prototype",
-        "confidence": 85,
-        "reasoning": "Brief architectural justification based strictly on the provided numbers."
-    }}
-    """
+{GROUNDING_RULES}
+
+You are assessing repository maturity from the deterministic metadata supplied below.
+Select exactly one stage from: Idea, Prototype, MVP, Growth, Mature.
+Base the decision only on the supplied counts and repository name.
+Return only a JSON object with this schema:
+{{
+  "stage": "Prototype",
+  "confidence": 85,
+  "reasoning": "Brief justification that cites only the supplied counts."
+}}
+
+Repository Data:
+- Name: {repo_meta.get('name', 'unknown')}
+- Total Files: {structure['files']}
+- Total Classes: {structure['classes']}
+- Total Functions: {structure['functions']}
+"""
     
     response = client.models.generate_content(
         model=model_name,
@@ -101,27 +105,32 @@ def detect_repository_issues(
         evidence += f"- Source Code Evidence:\n```python\n{code_snippet}\n```\n\n"
     
     prompt = f"""
-    You are a Senior Staff Auditor. I have run a deterministic AST analysis on the repository "{repo_meta['name']}".
-    
-    [HARD CODE EVIDENCE]
-    {evidence}
-    
-    Task:
-    Write a clear, concise issue report for EACH of the findings provided above. 
-    1. Look at the provided source code to see EXACTLY what is causing the high complexity/nesting.
-    2. Cite the specific logic (e.g., "The massive switch statement handling user auth...") in your description.
-    3. DO NOT invent new issues. Only explain the evidence provided.
-    
-    Respond ONLY with a valid JSON array matching this exact schema:
-    [
-        {{
-            "title": "High Complexity in [Function Name]",
-            "category": "Technical Debt",
-            "severity": "High",
-            "description": "Specific explanation of the messy logic found in the code snippet..."
-        }}
-    ]
-    """
+{GROUNDING_RULES}
+
+You are preparing a technical issue report from deterministic static analysis evidence for the repository "{repo_meta.get('name', 'unknown')}".
+Use one object per supplied finding and ground every statement in the evidence below.
+Do not infer unlisted defects, architecture issues, or business logic.
+
+Input Evidence:
+{evidence}
+
+Return only a JSON array of objects with this schema:
+[
+  {{
+    "issue": "Short, specific issue title",
+    "severity": "High|Medium|Low",
+    "location": "file:function or file",
+    "evidence": "Direct evidence from the supplied snippet and metrics",
+    "assessment": "Concise explanation of the observed structural condition",
+    "recommendation": "Concrete remediation tied to the supplied evidence",
+    "expected_benefit": "Expected effect of the remediation",
+    "confidence": "High|Medium|Low",
+    "title": "Short issue title",
+    "category": "Technical Debt",
+    "description": "Concise explanation derived only from the supplied evidence"
+  }}
+]
+"""
     
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     response = client.models.generate_content(
@@ -153,8 +162,6 @@ def generate_recommendations(
 ) -> list[dict[str, Any]]:
     """Generate engineering recommendations explicitly linked to deterministic findings."""
     
-    # --- PHASE 2.5 & 3: Finding Enrichment & Deterministic Priority Math ---
-    # --- PHASE 2.5 & 3: Finding Enrichment & Deterministic Priority Math ---
     payload = []
     for f in db_findings:
         # Map string severities to mathematical weights
@@ -177,29 +184,36 @@ def generate_recommendations(
         })
 
     prompt = f"""
-    You are a Lead Staff Engineer analyzing a {repo_meta.get('language', 'software')} repository.
-    Stage: {stage}
-    
-    [DETERMINISTIC CODE FINDINGS]
-    {json.dumps(payload, indent=2)}
-    
-    Task:
-    1. Group the provided findings into 3 to 5 high-level architectural Recommendations (e.g., "Refactor Routing Complexity").
-    2. Assign the exact 'finding_id' strings of the grouped findings to the recommendation.
-    3. DO NOT INVENT priority scores. The recommendation's 'priority_score' MUST be exactly the highest 'calculated_priority_score' out of its linked findings.
-    
-    Respond ONLY with a valid JSON array of objects matching this schema:
-    [
-        {{
-            "title": "Refactor Routing Complexity",
-            "description": "Decompose the deeply nested request handlers to improve maintainability.",
-            "priority_score": 9.8,
-            "impact_score": 9.0,
-            "effort_score": 5.0,
-            "linked_finding_ids": ["uuid-string-1", "uuid-string-2"]
-        }}
-    ]
-    """
+{GROUNDING_RULES}
+
+You are synthesizing the supplied findings into a small set of concrete engineering recommendations.
+Use only the finding payload provided below and reference only the finding IDs that are present in that payload.
+Do not introduce new defects, components, or architecture assumptions.
+
+Repository Language: {repo_meta.get('language', 'software')}
+Current Analysis Stage: {stage}
+
+Input Findings:
+{json.dumps(payload, indent=2)}
+
+Return only a JSON array of 3 to 5 objects with this schema:
+[
+  {{
+    "title": "Concrete recommendation title",
+    "description": "Specific remediation tied to the referenced findings",
+    "priority_score": 0.0,
+    "impact_score": 0.0,
+    "effort_score": 0.0,
+    "linked_finding_ids": ["id-1", "id-2"]
+  }}
+]
+
+Rules:
+- Each recommendation must be directly traceable to one or more supplied findings.
+- The priority_score must be exactly the maximum calculated_priority_score among the linked findings.
+- Keep descriptions concise, technical, and action-oriented.
+- Do not average, add, or invent scores.
+"""
     
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     response = client.models.generate_content(
@@ -227,32 +241,42 @@ def generate_blueprint(
         evidence += f"- Target: {f.file_path} (Function: {f.function_name}) | Issue: {f.title}\n"
         
     prompt = f"""
-    You are a Senior Staff {language} Engineer. Create an implementation blueprint.
-    
-    Task: {recommendation_title}
-    Context: {recommendation_desc}
-    
-    [RIGID CONSTRAINTS]
-    - Target Language: {language}
-    - Target Framework: {framework}
-    - CRITICAL: You MUST NOT generate file paths, extensions (like .ts for Python), or design patterns that do not belong in a standard {language} ecosystem.
-    
-    [HARD EVIDENCE TO REFACTOR]
-    {evidence}
-    
-    Respond ONLY with a valid JSON object matching this exact schema:
-    {{
-        "goal": "Clear statement of what will be achieved.",
-        "architecture_changes": ["List of high-level changes"],
-        "files_to_create": ["List of new file paths"],
-        "files_to_modify": ["List of existing files to change"],
-        "estimated_effort": "e.g., 2 weeks, 3 days",
-        "implementation_steps": ["Step 1:...", "Step 2:..."],
-        "validation_checklist": ["List of specific tests/checks to ensure the refactor works"],
-        "rollback_strategy": "Clear instructions on how to safely revert this change if it fails in production",
-        "migration_steps": ["Data or state migration steps, if any. Otherwise ['None required']"]
-    }}
-    """
+{GROUNDING_RULES}
+
+You are producing an implementation blueprint for the supplied refactoring objective.
+Use only the repository metadata and the finding evidence provided below.
+Do not invent languages, frameworks, libraries, modules, or file paths that are not justified by the supplied evidence.
+If the evidence does not support a new file, use an empty array for files_to_create rather than inventing a placeholder name.
+
+Repository Language: {language}
+Repository Framework: {framework}
+Refactoring Objective: {recommendation_title}
+Architectural Context: {recommendation_desc}
+
+Input Evidence:
+{evidence}
+
+Return only a JSON object with this schema:
+{{
+  "goal": "Precise engineering end-state",
+  "architecture_changes": ["High-level structural changes"],
+  "files_to_create": ["Path only if justified by evidence"],
+  "files_to_modify": ["Existing file paths supported by evidence"],
+  "target_functions": ["Function names from the supplied evidence"],
+  "implementation_steps": ["Concrete implementation steps"],
+  "validation_checklist": ["Concrete validation steps"],
+  "estimated_effort": "e.g. 2 days",
+  "rollback_considerations": "Concrete rollback plan",
+  "rollback_strategy": "Concrete rollback plan",
+  "migration_steps": ["None required"]
+}}
+
+Rules:
+- Keep the plan concrete and implementation-oriented.
+- Reference only target functions and files present in the evidence.
+- Do not assume unprovided technologies or frameworks.
+- Keep the output concise and deterministic.
+"""
     
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     response = client.models.generate_content(

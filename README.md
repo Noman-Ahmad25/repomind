@@ -1,293 +1,256 @@
 # RepoMind
 
-**Evidence-Driven Repository Intelligence Platform**
+> **Evidence-driven repository intelligence powered by deterministic static analysis and AI.**
 
-![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python\&logoColor=white)
-![Typer](https://img.shields.io/badge/Typer-CLI-009688)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql\&logoColor=white)
-![pgvector](https://img.shields.io/badge/pgvector-Vector_Search-4169E1)
-![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker\&logoColor=white)
-![Gemini](https://img.shields.io/badge/Gemini-2.5_Pro-4285F4?logo=google\&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-success)
+![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Typer](https://img.shields.io/badge/Typer-CLI-009688?style=for-the-badge)
+![Tree-sitter](https://img.shields.io/badge/Tree--sitter-AST-5B3FD6?style=for-the-badge)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![pgvector](https://img.shields.io/badge/pgvector-Vector_DB-336791?style=for-the-badge)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white)
+![Google Gemini](https://img.shields.io/badge/Google_Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)
+![Sentence Transformers](https://img.shields.io/badge/Sentence--Transformers-FF6F00?style=for-the-badge)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![uv](https://img.shields.io/badge/uv-Package_Manager-6E56CF?style=for-the-badge)
+![Ruff](https://img.shields.io/badge/Ruff-Linter-D7FF64?style=for-the-badge)
+![mypy](https://img.shields.io/badge/mypy-Type_Checked-2A6DB2?style=for-the-badge)
+![Pytest](https://img.shields.io/badge/pytest-Testing-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
+![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-RepoMind is an AI-assisted repository intelligence platform that combines **deterministic static analysis** with **LLM-powered engineering reasoning** to help developers identify technical debt, prioritize engineering improvements, and generate implementation blueprints.
+RepoMind is a CLI that analyzes software repositories using deterministic AST analysis, evaluates repository health, detects maintainability issues, prioritizes technical debt, and transforms verified findings into actionable engineering recommendations and implementation blueprints.
 
-Unlike repository chat tools that answer:
-
-> **"What does this code do?"**
-
-RepoMind answers:
-
-> **"What should engineers improve next, and why?"**
-
-RepoMind performs **evidence-first analysis** using deterministic Python AST inspection before leveraging AI to transform verified findings into engineering recommendations and implementation blueprints.
-
----
-
-# Features
-
-## Deterministic Code Intelligence
-
-* Deterministic AST-based repository auditing
-* Function-level cyclomatic complexity analysis
-* Nesting depth analysis
-* Exception handling analysis
-* Security anti-pattern detection
-* Broad exception detection
-* Empty exception detection
-* God File detection
-* Evidence-based repository health scoring
-* Configurable engineering rules via `rules.json`
-
-## AI-Powered Engineering Intelligence
-
-* Repository maturity detection
-* Engineering recommendation generation
-* Refactoring blueprint generation
-* Repository architecture reasoning
-
-## Repository Intelligence
-
-* Repository metadata extraction
-* Repository structure analysis
-* Dockerized PostgreSQL + pgvector knowledge base
-* Vector embedding cache to prevent duplicate indexing
-* CLI-first workflow
-* Persistent repository intelligence
+Unlike AI-only code review tools, RepoMind grounds every recommendation in deterministic evidence before using AI for reasoning and planning.
 
 ---
 
-# Example
+## Features
 
-```bash
-repomind analyze https://github.com/fastapi/fastapi
-```
+- 🔍 Deterministic AST-based repository analysis
+- 📊 Repository health scoring
+- 🤖 Evidence-based AI issue synthesis
+- 🎯 Prioritized engineering recommendations
+- 📋 Implementation blueprint generation
+- 📝 Markdown report generation
+- 🗄️ PostgreSQL + pgvector backed repository intelligence
+- ⚙️ Configurable engineering rule profiles
 
-Example output
+---
+
+## Workflow
 
 ```text
-Repository Stage: Mature
-
-Health Report
-Architecture: 82/100
-Testing: 77/100
-Security: 91/100
-Documentation: 85/100
-Scalability: 96/100
-
-Top Findings
-
-• GOD_FILE
-  fastapi/routing.py
-  6231 LOC
-
-• HIGH_COMPLEXITY
-  get_request_handler()
-  Complexity: 35
-
-• BROAD_EXCEPTION
-  get_request_handler()
-
-Recommended Next Action
-
-Refactor routing.py into smaller routing modules to improve maintainability and reduce architectural complexity.
+Repository
+     │
+     ▼
+Analyze / Audit
+     │
+     ▼
+Deterministic AST Analysis
+     │
+     ▼
+Repository Health Assessment
+     │
+     ▼
+AI Issue Synthesis
+     │
+     ▼
+Engineering Recommendations
+     │
+     ▼
+Implementation Blueprints
+     │
+     ▼
+Markdown Reports
 ```
 
 ---
 
-# Core Analysis Capabilities
+## Quick Start (Docker)
 
-RepoMind currently detects:
+Start RepoMind with PostgreSQL:
 
-* High cyclomatic complexity
-* Deep nesting
-* Broad exception handling
-* Empty exception blocks
-* Oversized modules (God Files)
-* Repository architecture metrics
-* Repository maturity
-* Deterministic repository health scores
+```bash
+docker compose up -d app
+```
+
+Run commands inside the container:
+
+```bash
+# Analyze a repository (recommended)
+docker compose exec app repomind analyze https://github.com/fastapi/fastapi --rules rules_relaxed.json
+
+# Strict analysis
+docker compose exec app repomind analyze https://github.com/fastapi/fastapi --rules rules_strict.json
+
+# Run deterministic AST audit
+docker compose exec app repomind audit https://github.com/fastapi/fastapi --rules rules_relaxed.json
+
+# Generate implementation blueprint
+docker compose exec app repomind blueprint <recommendation-id>
+
+# Export blueprint
+docker compose exec app repomind blueprint <recommendation-id> --export
+
+# Export repository report
+docker compose exec app repomind report https://github.com/fastapi/fastapi
+```
+
+Stop RepoMind:
+
+```bash
+docker compose down
+```
 
 ---
 
-# Installation
+## Local Installation
 
-Clone the repository
+Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/repomind.git
+git clone https://github.com/Noman-Ahmad25/repomind.git
 
 cd repomind
 ```
 
-Install dependencies
+Install dependencies:
 
 ```bash
 uv sync
 ```
 
-Start PostgreSQL with pgvector
-
-```bash
-docker compose up -d
-```
-
-Create a `.env` file
+Create a `.env` file:
 
 ```env
-DATABASE_URL=postgresql://postgres:password@localhost:5432/repomind
 GEMINI_API_KEY=your_api_key
+
+DATABASE_URL=postgresql+psycopg://postgres:password@localhost:5432/repomind
+```
+
+Start PostgreSQL and run:
+
+```bash
+repomind analyze https://github.com/fastapi/fastapi --rules rules_relaxed.json
 ```
 
 ---
 
-# Database
+## Rule Profiles
 
-RepoMind uses **PostgreSQL 16** with the **pgvector** extension running inside Docker for storing:
+RepoMind ships with configurable rule profiles.
 
-* Repository metadata
-* Repository health reports
-* Engineering findings
-* Recommendations
-* Vector embeddings
+### Relaxed
 
-Default Docker configuration
+Recommended for general repository analysis.
 
-| Setting  | Value                  |
-| -------- | ---------------------- |
-| Image    | pgvector/pgvector:pg16 |
-| Database | repomind               |
-| Username | postgres               |
-| Password | password               |
-| Port     | 5432                   |
+```bash
+repomind analyze <repository> --rules rules_relaxed.json
+```
 
-Persistent data is stored using a Docker volume.
+### Strict
+
+Applies lower thresholds to detect more engineering issues.
+
+```bash
+repomind analyze <repository> --rules rules_strict.json
+```
 
 ---
 
-# Usage
-
-Analyze a repository
+## Typical Workflow
 
 ```bash
-repomind analyze <repository-url>
-```
+# Analyze repository
+repomind analyze <repository> --rules rules_relaxed.json
 
-Run a deterministic AST audit
+# Review deterministic findings
+repomind audit <repository> --rules rules_relaxed.json
 
-```bash
-repomind audit <repository-url>
-```
+# Export analysis report
+repomind report <repository>
 
-Generate an implementation blueprint
-
-```bash
+# Generate implementation blueprint
 repomind blueprint <recommendation-id>
+
+# Export blueprint
+repomind blueprint <recommendation-id> --export
 ```
 
-Generate an engineering report
-
-```bash
-repomind report <repository-url>
-```
-
----
-
-# Architecture
+Generated reports are saved under:
 
 ```text
-                     Git Repository
-                            │
-                            ▼
-                  Repository Parser
-                            │
-                            ▼
-                Deterministic AST Engine
-                            │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-        ▼                   ▼                   ▼
- Complexity Analysis   Security Analysis   God File Detection
-        │                   │                   │
-        └───────────────────┼───────────────────┘
-                            │
-                            ▼
-           Evidence-Based Health Scoring Engine
-                            │
-               ┌────────────┴────────────┐
-               ▼                         ▼
-     PostgreSQL Metadata         pgvector Embeddings
-          (Docker)                   (Docker)
-               │                         │
-               └────────────┬────────────┘
-                            ▼
-               AI Engineering Intelligence
-                            │
-                            ▼
-             Recommendations & Blueprints
+reports/
+└── owner_repository/
+    ├── analysis_owner_repository.md
+    ├── blueprint_<recommendation-id>.md
+    └── ...
 ```
 
 ---
 
-# Tech Stack
+## Tech Stack
 
-## Core
-
-* Python
-* Typer
-
-## Database & Infrastructure
-
-* PostgreSQL 16
-* pgvector
-* Docker
-* Docker Compose
-
-## Static Analysis
-
-* Python AST
-* Tree-Sitter
-* GitPython
-
-## AI
-
-* Gemini 2.5 Pro
-* BAAI BGE Small Embeddings
-
-## Developer Experience
-
-* Ruff
-* MyPy
-* Pytest
+- Python 3.12+
+- Typer
+- Tree-sitter
+- Python AST
+- PostgreSQL
+- pgvector
+- SQLAlchemy
+- Google Gemini
+- Sentence Transformers
+- GitPython
+- Docker
 
 ---
 
-# Project Status
+## Example Output
 
-RepoMind is actively evolving into an engineering intelligence platform.
+```
+Architecture     97/100
+Testing          92/100
+Security         76/100
+Documentation    85/100
+Scalability     100/100
 
-## Current Capabilities
+Overall          91/100
+```
 
-* Deterministic AST-based repository analysis
-* Evidence-based repository health scoring
-* AI-assisted engineering recommendations
-* Implementation blueprint generation
-* Repository vector indexing with pgvector
-* Dockerized PostgreSQL infrastructure
-* Configurable engineering rules
-* CLI-first workflow
+```
+Top Recommendation
 
-## Planned Improvements
+Refactor get_openapi_path to reduce cyclomatic complexity
 
-* Additional AST analysis rules
-* Rich engineering reports
-* Enhanced implementation blueprints
-* Multi-language support
-* Performance optimizations
-* Advanced architectural metrics
+Priority 9.4/10
+Impact   8.5
+Effort   7.0
+```
 
 ---
 
-# License
+## Documentation
 
-MIT License
+Comprehensive documentation, architecture details, and implementation guides are available on the project documentation website.
+
+---
+
+## Roadmap
+
+- Multi-language analysis
+- Semantic repository search
+- Incremental analysis
+- GitHub integration
+- Automatic fix generation
+- Agentic implementation workflows
+
+---
+
+## Contributing
+
+Contributions, bug reports, feature requests, and discussions are welcome.
+
+---
+
+## License
+
+MIT License.
