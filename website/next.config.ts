@@ -9,9 +9,8 @@ const nextConfig: NextConfig = {
   },
   ...(isProduction
     ? {
-        basePath: "/repomind",
-        assetPrefix: "/repomind/",
-      }
+        basePath: "/repomind", 
+    }
     : {}),
 };
 
