@@ -1,132 +1,150 @@
+import type { Metadata } from "next";
+
+import { Callout, CodeBlock, PageHeader, Section } from "@/components/docs";
+
+export const metadata: Metadata = {
+  title: "Quick Start",
+  description:
+    "Run RepoMind's analyze, audit, report, blueprint, and blueprint export workflow.",
+};
+
+const repoUrl = "https://github.com/fastapi/fastapi";
+
+const analyze = `docker compose exec app repomind analyze ${repoUrl} --rules rules_relaxed.json`;
+
+const analyzeOutput = `RepoMind AI  ·  Static Analysis & Intelligence
+══════════════════════════════════════════════════════════
+    Target            https://github.com/fastapi/fastapi
+    Rules             rules_relaxed.json
+
+Clone
+──────────────────────────────────────────────────────────
+  →  Fetching latest commits...
+  ✔  Cloned to repositories/fastapi_fastapi
+
+Scan
+──────────────────────────────────────────────────────────
+  →  Running single-pass AST scan...
+    Project Type      Python Backend/Script
+    Languages         Python
+    Files Parsed      1129
+    Functions Found   4833
+
+Health Scores
+──────────────────────────────────────────────────────────
+    Architecture      82/100
+    Testing           77/100
+    Security          91/100
+    Documentation     85/100
+    Scalability       96/100
+    Overall           88/100`;
+
+const audit = `docker compose exec app repomind audit ${repoUrl} --rules rules_relaxed.json`;
+
+const auditOutput = `RepoMind AI  ·  AST Audit
+══════════════════════════════════════════════════════════
+    Path              repositories/fastapi_fastapi
+    Rules             rules_relaxed.json
+
+AST Scan
+──────────────────────────────────────────────────────────
+  →  Parsing source files and evaluating rule violations...
+  12 violation(s)  ·  2.41s
+  Ranked by cyclomatic complexity — top 10`;
+
+const report = `docker compose exec app repomind report ${repoUrl}`;
+
+const reportOutput = `RepoMind AI  ·  Report Export
+══════════════════════════════════════════════════════════
+    Target            https://github.com/fastapi/fastapi
+
+Compile
+──────────────────────────────────────────────────────────
+  →  Loading health scores, findings, and recommendations...
+  →  Rendering Markdown report...
+  ✔  Report saved to reports/fastapi_fastapi/analysis_fastapi_fastapi.md`;
+
+const blueprint = `docker compose exec app repomind blueprint <recommendation-id>`;
+
+const blueprintExport = `docker compose exec app repomind blueprint <recommendation-id> --export`;
+
+const reportLocations = `reports/
+└── fastapi_fastapi/
+    ├── analysis_fastapi_fastapi.md
+    ├── blueprint_3f7a51c2.md
+    └── ...`;
 
 export default function QuickStartPage() {
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <h1 className="text-4xl font-bold tracking-tight text-white mb-4">
-        Quick Start
-      </h1>
+    <div className="space-y-10">
+      <PageHeader
+        eyebrow="Getting Started"
+        title="Quick Start"
+        description={
+          <>
+            This workflow runs RepoMind against a repository, reviews
+            deterministic findings, exports a Markdown report, and generates an
+            implementation blueprint from a recommendation.
+          </>
+        }
+      />
 
-      <p className="text-zinc-400 text-lg leading-relaxed">
-        RepoMind provides four primary commands for repository analysis,
-        deterministic auditing, engineering reporting, and implementation
-        blueprint generation.
-      </p>
+      <Callout title="Use the relaxed rule profile first" variant="tip">
+        <code className="text-zinc-100">rules_relaxed.json</code> is the
+        recommended starting profile for general repository analysis. Switch to
+        the strict profile when you want a more aggressive release-readiness
+        review.
+      </Callout>
 
-      <div className="mt-8 space-y-10">
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            Analyze a Repository
-          </h2>
+      <Section
+        title="1. Analyze"
+        description="Run the complete pipeline: clone, AST scan, rule evaluation, health scoring, AI issue synthesis, and recommendation generation."
+      >
+        <CodeBlock title="analyze" code={analyze} />
+        <CodeBlock title="expected output" code={analyzeOutput} language="text" />
+      </Section>
 
-          <p className="text-zinc-400 mb-3">
-            Run the complete engineering intelligence pipeline. RepoMind clones
-            the repository, parses its architecture, generates (or reuses)
-            embeddings, performs deterministic AST analysis, calculates
-            evidence-based health scores, and produces AI-assisted engineering
-            recommendations.
-          </p>
+      <Section
+        title="2. Audit"
+        description="Review deterministic AST findings without generating AI recommendations."
+      >
+        <CodeBlock title="audit" code={audit} />
+        <CodeBlock title="expected output" code={auditOutput} language="text" />
+      </Section>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-md p-4 font-mono text-sm text-green-400 overflow-x-auto whitespace-nowrap">
-            <span className="text-zinc-500">$</span>{" "}
-            repomind analyze https://github.com/fastapi/fastapi
-          </div>
+      <Section
+        title="3. Report"
+        description="Export health scores, findings, and prioritized recommendations to Markdown."
+      >
+        <CodeBlock title="report" code={report} />
+        <CodeBlock title="expected output" code={reportOutput} language="text" />
+      </Section>
 
-          <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-            <h3 className="text-zinc-100 font-semibold mb-4">
-              Analysis Pipeline
-            </h3>
+      <Section
+        title="4. Blueprint"
+        description="Use a recommendation ID from the analyze output to generate a concrete implementation plan."
+      >
+        <CodeBlock title="blueprint" code={blueprint} />
+        <Callout title="Where recommendation IDs come from">
+          The <code className="text-zinc-100">analyze</code> command prints
+          saved recommendation IDs. Each ID can be passed to{" "}
+          <code className="text-zinc-100">repomind blueprint</code>.
+        </Callout>
+      </Section>
 
-            <pre className="text-sm text-zinc-400 leading-7 overflow-x-auto">
-{`Git Repository
-      │
-      ▼
-Repository Parsing
-      │
-      ▼
-Embedding Generation / Cache
-      │
-      ▼
-Deterministic AST Audit
-      │
-      ▼
-Evidence-Based Health Scoring
-      │
-      ▼
-AI Engineering Recommendations
-      │
-      ▼
-Implementation Blueprints`}
-            </pre>
-          </div>
-        </section>
+      <Section
+        title="5. Blueprint Export"
+        description="Add --export to save the generated blueprint as Markdown."
+      >
+        <CodeBlock title="blueprint export" code={blueprintExport} />
+      </Section>
 
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            Deterministic Audit
-          </h2>
-
-          <p className="text-zinc-400 mb-3">
-            Perform a fast, local-only AST audit without generating AI
-            recommendations. This command identifies engineering issues directly
-            from source code using deterministic analysis.
-          </p>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-md p-4 font-mono text-sm text-green-400 overflow-x-auto whitespace-nowrap">
-            <span className="text-zinc-500">$</span>{" "}
-            repomind audit https://github.com/fastapi/fastapi
-          </div>
-
-          <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <h3 className="text-zinc-100 font-semibold mb-3">
-              Detects
-            </h3>
-
-            <ul className="list-disc list-inside text-zinc-400 space-y-2">
-              <li>High cyclomatic complexity</li>
-              <li>Deep nesting</li>
-              <li>Broad exception handling</li>
-              <li>Empty exception blocks</li>
-              <li>God Files</li>
-              <li>Repository health metrics</li>
-            </ul>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            Generate an Engineering Report
-          </h2>
-
-          <p className="text-zinc-400 mb-3">
-            Export repository findings, health scores, and recommendations into
-            a Markdown report suitable for sharing with your engineering team.
-          </p>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-md p-4 font-mono text-sm text-green-400 overflow-x-auto whitespace-nowrap">
-            <span className="text-zinc-500">$</span>{" "}
-            repomind report https://github.com/fastapi/fastapi
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-2xl font-semibold text-zinc-100 mb-4 border-b border-zinc-800 pb-2">
-            Generate an Implementation Blueprint
-          </h2>
-
-          <p className="text-zinc-400 mb-3">
-            After running <code>analyze</code>, use the recommendation ID to
-            generate a detailed implementation blueprint describing how to
-            resolve the identified engineering issue.
-          </p>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-md p-4 font-mono text-sm text-green-400 overflow-x-auto whitespace-nowrap">
-            <span className="text-zinc-500">$</span>{" "}
-            repomind blueprint &lt;recommendation_id&gt; --export
-          </div>
-        </section>
-      </div>
+      <Section
+        title="Generated Locations"
+        description="Reports and exported blueprints are written under a repository-specific folder."
+      >
+        <CodeBlock title="reports directory" code={reportLocations} language="text" />
+      </Section>
     </div>
   );
 }
-
-
